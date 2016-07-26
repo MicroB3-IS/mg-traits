@@ -21,6 +21,8 @@ SINA_JOBARRAYID="mt-${JOB_ID}-sina"
 FINISHJOBID="mt-${JOB_ID}-finish"
 TMP_VOL_FILE="/vol/tmp/megx/${JOB_NAME}.${JOB_ID}"
 
+echo "starts?" > /bioinf/projects/megx/mg-traits/TARA_crunch/preprocess_data/tmp
+
 ###########################################################################################################
 # 0 - Parse parameters
 ###########################################################################################################
