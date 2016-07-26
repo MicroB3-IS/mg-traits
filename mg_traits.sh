@@ -23,6 +23,9 @@ FGS_JOBARRAYID="mt-${JOB_ID}-fgs"
 SINA_JOBARRAYID="mt-${JOB_ID}-sina"
 FINISHJOBID="mt-${JOB_ID}-finish"
 TMP_VOL_FILE="/vol/tmp/megx/${JOB_NAME}.${JOB_ID}"
+PFAM_ACCESSIONS="${THIS_JOB_TMP_DIR}/data/pfam28_acc.txt"
+TFFILE="${THIS_JOB_TMP_DIR}/data/TF.txt"
+SLV_FILE="${THIS_JOB_TMP_DIR}/data/silva_tax_order_115.txt"
 
 ###########################################################################################################
 # 0 - Parse parameters
@@ -206,9 +209,6 @@ fi
 ###########################################################################################################
 # 6 - Download data files from SVN
 ###########################################################################################################
-PFAM_ACCESSIONS="${THIS_JOB_TMP_DIR}"/data/pfam28_acc.txt
-TFFILE="${THIS_JOB_TMP_DIR}"/data/TF.txt
-SLV_FILE="${THIS_JOB_TMP_DIR}"/data/silva_tax_order_115.txt
 
 # pfam downlaod
 echo "${PFAM_ACCESSIONS_URL}"
@@ -332,6 +332,7 @@ PFAM_ACCESSIONS="${PFAM_ACCESSIONS}"
 TFFILE="${TFFILE}"
 SLV_FILE="${SLV_FILE}"
 THIS_JOB_TMP_DIR="${THIS_JOB_TMP_DIR}"
+SINA_LOG_DIR="${SINA_LOG_DIR}"
 EOF
 
 ###########################################################################################################
