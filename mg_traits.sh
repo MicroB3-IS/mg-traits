@@ -4,10 +4,22 @@ set -o pipefail
 
 START_TIME=$(date +%s.%N)
 
-echo "Environment variables:"
-
+##########################################################################################################
+# mg traits general variables
+##########################################################################################################
 source ~/.bashrc
 source /bioinf/projects/megx/mg-traits/resources/config_files/config.bash
+
+##########################################################################################################
+# mg traits job specific variables
+##########################################################################################################
+THIS_JOB_TMP_DIR=$(readlink -m "${RUNNING_JOBS_DIR}/job-${JOB_ID}")
+THIS_JOB_TMP_DIR_DATA="${THIS_JOB_TMP_DIR}/data/"
+SINA_LOG_DIR="${THIS_JOB_TMP_DIR}/sina_log"
+FGS_JOBARRAYID="mt-${JOB_ID}-fgs"
+SINA_JOBARRAYID="mt-${JOB_ID}-sina"
+FINISHJOBID="mt-${JOB_ID}-finish"
+TMP_VOL_FILE="/vol/tmp/megx/${JOB_NAME}.${JOB_ID}"
 
 ###########################################################################################################
 # 0 - Parse parameters
@@ -62,14 +74,11 @@ fi
 done
 
 
-#####################################################################################################
-# Define database communication function
-#####################################################################################################
+##########################################################################################################
+# Load functions: Only after all the variables have been defined
+##########################################################################################################
 
-function db_error_comm() {
-  echo "UPDATE mg_traits.mg_traits_jobs SET time_finished = now(), return_code = 1, error_message = '${1}' \
-  WHERE sample_label = '${SAMPLE_LABEL}' AND id = '${MG_ID}';" | psql -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}"
-}
+source /bioinf/projects/megx/mg-traits/resources/config_files/config.function.bash
 
 ###########################################################################################################
 # 1 - Check database connection
@@ -194,6 +203,9 @@ fi
 ###########################################################################################################
 # 6 - Download data files from SVN
 ###########################################################################################################
+PFAM_ACCESSIONS="${THIS_JOB_TMP_DIR}"/data/pfam28_acc.txt
+TFFILE="${THIS_JOB_TMP_DIR}"/data/TF.txt
+SLV_FILE="${THIS_JOB_TMP_DIR}"/data/silva_tax_order_115.txt
 
 # pfam downlaod
 echo "${PFAM_ACCESSIONS_URL}"
@@ -204,7 +216,6 @@ if [[ "$?" -ne "0" ]]; then
   db_error_comm "Could not retrieve ${PFAM_ACCESSIONS_URL}"
   cleanup && exit 1; 
 fi
-
 
 # tf_file download
 echo "${TFFILE_URL}"
@@ -303,7 +314,7 @@ printf "Number of bases: %d\nGC content: %f\nGC variance: %f\n" "${NUM_BASES}" "
 # define environment for sub jobs
 ###########################################################################################################
 
-cat > 01-job_env << EOF 
+cat > 01-subjobs_env << EOF 
 JOB_ID="${JOB_ID}"
 SAMPLE_LABEL="${SAMPLE_LABEL}"
 MG_ID="${MG_ID}"
@@ -314,6 +325,10 @@ NUM_BASES="${NUM_BASES}"
 NUM_READS="${NUM_READS}"
 RUNNING_JOBS_DIR="${RUNNING_JOBS_DIR}"
 MG_URL="${MG_URL}"
+PFAM_ACCESSIONS="${PFAM_ACCESSIONS}"
+TFFILE="${TFFILE}"
+SLV_FILE="${SLV_FILE}"
+THIS_JOB_TMP_DIR="${THIS_JOB_TMP_DIR}"
 EOF
 
 ###########################################################################################################
