@@ -1,4 +1,4 @@
-Trait,Mean ± SD/ PC1 %inertia,Moran's (I),Coastal vs Open Ocean ANISOM R,Environment ANISOM R
+Trait,Mean ± SD / PC1 %inertia,Moran's (I),Coastal vs Open Ocean ANOSIM R,Environment ANOSIM R
 GC Content ,39.14 ± 5.40 ,-0.23 (0.014),0.044 (0.123),0.122 (0.019)
 GC Variance,94.37 ± 36.87,-0.05 (0.619),-0.015 (0.587),0.045 (0.136)
 Dinucleotides,46.62,-0.17 (0.082), 0.066 (0.047),0.143 (0.01)
