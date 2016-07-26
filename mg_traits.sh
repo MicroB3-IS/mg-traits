@@ -333,6 +333,10 @@ TFFILE="${TFFILE}"
 SLV_FILE="${SLV_FILE}"
 THIS_JOB_TMP_DIR="${THIS_JOB_TMP_DIR}"
 SINA_LOG_DIR="${SINA_LOG_DIR}"
+target_db_user="${target_db_user}"
+target_db_host="${target_db_host}"
+target_db_port="${target_db_port}"
+target_db_name="${target_db_name}"
 EOF
 
 ###########################################################################################################
