@@ -7,6 +7,9 @@ START_TIME=$(date +%s.%N)
 ##########################################################################################################
 # mg traits general variables
 ##########################################################################################################
+
+echo "starts?" > /bioinf/projects/megx/mg-traits/TARA_crunch/preprocess_data/tmp
+
 source ~/.bashrc
 source /bioinf/projects/megx/mg-traits/resources/config_files/config.bash
 
@@ -20,8 +23,6 @@ FGS_JOBARRAYID="mt-${JOB_ID}-fgs"
 SINA_JOBARRAYID="mt-${JOB_ID}-sina"
 FINISHJOBID="mt-${JOB_ID}-finish"
 TMP_VOL_FILE="/vol/tmp/megx/${JOB_NAME}.${JOB_ID}"
-
-echo "starts?" > /bioinf/projects/megx/mg-traits/TARA_crunch/preprocess_data/tmp
 
 ###########################################################################################################
 # 0 - Parse parameters
