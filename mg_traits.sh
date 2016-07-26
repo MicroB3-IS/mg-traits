@@ -8,8 +8,6 @@ START_TIME=$(date +%s.%N)
 # mg traits general variables
 ##########################################################################################################
 
-echo "starts?" > /bioinf/projects/megx/mg-traits/TARA_crunch/preprocess_data/tmp
-
 source ~/.bashrc
 source /bioinf/projects/megx/mg-traits/resources/config_files/config.bash
 
