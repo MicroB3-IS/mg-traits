@@ -285,6 +285,8 @@ curl -s "${MG_URL_LOG}" > pre-process.SR_vsearch.log
 NUM_READS=$( sed -n 3p pre-process.SR_vsearch.log | cut -f10 -d" " )
 #### ONLY FOR TARA!!!! ######
 
+qdel 849620 849627 849636 849624 849632 849640 
+
 #NUM_READS=$(grep 'Total number of sequences:'  "${UNIQUE_LOG}" | awk '{print $(NF)}')
 #NUM_UNIQUE=$(grep 'Number of clusters found:'  "${UNIQUE_LOG}" | awk '{print $(NF)}')
 
