@@ -46,12 +46,6 @@ string=$(echo "$1" | sed -e 's/&/|/g' -e 's/\+/ /g' -e 's/%25/%/g' -e 's/%20/ /g
 -e 's/%5d/\]/g' -e 's/%5e/\^/g' -e 's/%5f/_/g' -e 's/%60/`/g' -e 's/%7b/{/g' -e 's/%7c/|/g' -e 's/%7d/}/g' \
 -e 's/%7e/~/g' -e 's/%09/      /g')
 
-# string=$(echo "${1}" | sed -e 's/&/|/g' -e 's/\+/ /g' -e 's/%25/%/g' -e 's/%20/ /g' -e 's/%09/ /g' -e 's/%21/!/g' -e \
-# 's/%22/"/g' -e 's/%23/#/g' -e 's/%24/\$/g' -e 's/%26/\&/g' -e 's/%27/'\''/g' -e 's/%28/(/g' -e 's/%29/)/g' -e \
-# 's/%2a/\*/g' -e 's/%2b/+/g' -e 's/%2c/,/g' -e 's/%2d/-/g' -e 's/%2e/\./g' -e 's/%2f/\//g' -e 's/%3a/:/g' -e 's/%3b/;/g'\
-# -e 's/%3d/=/g' -e 's/%3e//g' -e 's/%3f/?/g' -e 's/%40/@/g' -e 's/%5b/\[/g' -e 's/%5c/\\/g' -e 's/%5d/\]/g' -e \
-# 's/%5e/\^/g' -e 's/%5f/_/g' -e 's/%60/`/g' -e 's/%7b/{/g' -e 's/%7c/|/g' -e 's/%7d/}/g' -e 's/%7e/~/g' -e 's/%09/      /g')
-
 # set delimiter
 IFS="|"
 
@@ -126,11 +120,6 @@ if [[ "${DB_RESULT}" != "UPDATE 1" ]]; then
   email_comm "sample name ${SAMPLE_LABEL} is not in database Result:${DB_RESULT}"  
   cleanup && exit 2
 fi
-
-
-mail -s "test flag" epereira@mpi-bremen.de << EOF
-"sample ${SAMPLE_LABEL}, mg_url ${MG_URL}, mg_id ${MG_ID}, job_id ${JOB_ID}, db_result ${DB_RESULT}"
-EOF
 
 ###########################################################################################################
 # 2 - Create job directory
@@ -216,7 +205,8 @@ FASTA_ERROR_CODE="$?"
 if [[ "${FASTA_ERROR_CODE}" -ne "0" ]]; then
   FASTA_BAD_HEADER=$(grep '>' "${FASTA_BAD}" | tr -d '>'); 
   
-  email_comm "${MG_URL} is not a valid FASTA file. FASTA validation failed at sequence ${FASTA_BAD_HEADER}, error: ${FASTA_ERROR_CODE}. See ${FASTA_BAD}. ${fasta_file_check} ${RAW_FASTA} ${FASTA_BAD}"
+  email_comm "${MG_URL} is not a valid FASTA file. FASTA validation failed at sequence ${FASTA_BAD_HEADER}, error: \
+  ${FASTA_ERROR_CODE}. See ${FASTA_BAD}. ${fasta_file_check} ${RAW_FASTA} ${FASTA_BAD}"
   db_error_comm  "${MG_URL} is not a valid FASTA file. Sequence validation failed. Error: ${FASTA_ERROR_CODE}. See ${FASTA_BAD}"
   
   cleanup && exit 1
@@ -266,7 +256,7 @@ curl -s "${SLV_TAX_URL}" > "${SLV_FILE}"
 if [[ "$?" -ne "0" ]]; then 
   email_comm "Could not retrieve ${SLV_TAX_URL}"
   db_error_comm "Could not retrieve ${SLV_TAX_URL}"
-  cleanup && exit 1; 
+  cleanup && exit 1;
 fi
 
 ###########################################################################################################
@@ -373,7 +363,7 @@ EOF
 awk -vn="${NSEQ}" 'BEGIN {n_seq=0;partid=1;} /^>/ {if(n_seq%n==0){file=sprintf("05-part-%d.fasta",partid);partid++;} print >> file; n_seq++; next;} { print >> file; }' < "${RAW_FASTA}"
 NFILES=$(find . -name "05-part*.fasta" | wc -l)
 
-qsub  -t 1-"${NFILES}" -pe threaded "${NSLOTS}" -N "${FGS_JOBARRAYID}" "${fgs_runner}"
+qsub -t 1-"${NFILES}" -pe threaded "${NSLOTS}" -N "${FGS_JOBARRAYID}" "${fgs_runner}"
 
 ERROR_FGS=$?
 
@@ -431,7 +421,7 @@ fi
 # 4 - run finish traits
 ###########################################################################################################
 
-qsub -sync y -pe threaded "${NSLOTS}" -N "${FINISHJOBID}" -o "${THIS_JOB_TMP_DIR}" -e "${THIS_JOB_TMP_DIR}" -l ga -j y -terse -P megx.p -R y -m sa -M "${mt_admin_mail}" \
+qsub -sync y -pe threaded "${NSLOTS}" -N "${FINISHJOBID}" -o "${THIS_JOB_TMP_DIR}" -wd "${THIS_JOB_TMP_DIR}" -l ga -j y -terse -P megx.p -R y -m sa -M "${mt_admin_mail}" \
 -hold_jid "${FGS_JOBARRAYID}","${SINA_JOBARRAYID}"  /bioinf/projects/megx/mg-traits/resources/bin/finish_runner.sh "${THIS_JOB_TMP_DIR}"
 
 if [[ "$?" -ne "0" ]]; then
