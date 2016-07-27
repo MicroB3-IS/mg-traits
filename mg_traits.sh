@@ -127,7 +127,7 @@ fi
 
 # rm -r ${THIS_JOB_TMP_DIR}  # CHANGE THIS FOR REAL DATA!!!!!!!!!! 
 # qdel -u megxnet  # CHANGE THIS FOR REAL DATA!!!!!!!!!! 
-# echo "UPDATE mg_tratis.mg_traits_jobs  SET return_code = 130 WHERE return_code = -1;" \
+# echo "UPDATE mg_traits.mg_traits_jobs  SET return_code = 130 WHERE return_code = -1;" \
 #   | psql -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}"
 
 # rm -r /bioinf/projects/megx/scratch/mg-traits/running_jobs/job-83*  # CHANGE THIS FOR REAL DATA
@@ -285,7 +285,7 @@ curl -s "${MG_URL_LOG}" > pre-process.SR_vsearch.log
 NUM_READS=$( sed -n 3p pre-process.SR_vsearch.log | cut -f10 -d" " )
 #### ONLY FOR TARA!!!! ######
 
-qdel 849620 849627 849636 849624 849632 849640 
+qdel 849644 849650 849649 849649
 
 #NUM_READS=$(grep 'Total number of sequences:'  "${UNIQUE_LOG}" | awk '{print $(NF)}')
 #NUM_UNIQUE=$(grep 'Number of clusters found:'  "${UNIQUE_LOG}" | awk '{print $(NF)}')
