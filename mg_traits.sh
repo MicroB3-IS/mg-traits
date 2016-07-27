@@ -394,7 +394,7 @@ MEM=4000
 module load sortmerna/2.0
 ##### load sortmerna module #####
 
-qsub sync -y -pe threaded "${NSLOTS}" -N "${SMRNA_JOBID}" "${sortmerna_runner}"
+qsub -sync -y -pe threaded "${NSLOTS}" -N "${SMRNA_JOBID}" "${sortmerna_runner}"
 
 if [[ "${ERROR_SORTMERNA}" -ne "0" ]]; then
   email_comm "${sortmerna} --reads ${RAW_FASTA} -a ${NSLOTS} --ref ${DB}/rRNA_databases/silva-bac-16s-id90.fasta ...
