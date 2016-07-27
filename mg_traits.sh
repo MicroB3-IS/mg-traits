@@ -136,7 +136,6 @@ EOF
 # 2 - Create job directory
 ###########################################################################################################
 
-echo "This job tmp dir: ${THIS_JOB_TMP_DIR}";  
 # rm -r ${THIS_JOB_TMP_DIR}  # CHANGE THIS FOR REAL DATA!!!!!!!!!! 
 # qdel -u megxnet  # CHANGE THIS FOR REAL DATA!!!!!!!!!! 
 # echo "UPDATE mg_tratis.mg_traits_jobs  SET return_code = 130 WHERE return_code = -1;" \
@@ -206,8 +205,6 @@ if [[ "$?" -ne "0" ]]; then
   echo "File was uncompressed"
   rm "${RAW_FASTA}"; mv "${RAW_DOWNLOAD}" "${RAW_FASTA}" # NEEDS REVIEW: TRAP AND DB COMMUNICATION?
 fi
- 
-
 
 ###########################################################################################################
 # 4 -  Validate file
@@ -230,9 +227,9 @@ fi
 ###########################################################################################################
 
 ERROR_MESSAGE=$(\
-check_required_writable_directories "${temp_dir}" "${RUNNING_JOBS_DIR}" "${FAILED_JOBS_DIR}" "${job_out_dir}";
-check_required_readable_directories "${mg_traits_dir}"; 
-check_required_programs "${cd_hit_dup}" "${cd_hit_est}" "${cd_hit_mms}" "${uproc}" "${r_interpreter}";\
+check_required_writable_directories "${temp_dir:?}" "${RUNNING_JOBS_DIR:?}" "${FAILED_JOBS_DIR:?}" "${job_out_dir:?}";
+check_required_readable_directories "${mg_traits_dir:?}"; 
+check_required_programs "${vsearch}" "${uproc}" "${r_interpreter:?}" "${sina:?}" "${frag_gene_scan:?}" "${sortmerna:?}";\
 )
 
 if [[ -n "${ERROR_MESSAGE}" ]]; then
@@ -377,7 +374,6 @@ awk -vn="${NSEQ}" 'BEGIN {n_seq=0;partid=1;} /^>/ {if(n_seq%n==0){file=sprintf("
 NFILES=$(find . -name "05-part*.fasta" | wc -l)
 
 qsub  -t 1-"${NFILES}" -pe threaded "${NSLOTS}" -N "${FGS_JOBARRAYID}" "${fgs_runner}"
-# "${fgs_runner}" "${NSLOTS}" "${NFILES}" "${FGS_JOBARRAYID}"
 
 ERROR_FGS=$?
 
@@ -392,9 +388,6 @@ fi
 ## 2 - run sortmerna
 ############################################################################################################
 
-#MEM=$(free -m | grep Mem | awk '{printf "%d",$2/3}')
-MEM=4000
-
 ##### load sortmerna module #####
 module load sortmerna/2.0
 ##### load sortmerna module #####
@@ -402,7 +395,7 @@ module load sortmerna/2.0
 qsub -sync y -pe threaded "${NSLOTS}" -N "${SMRNA_JOBID}" "${sortmerna_runner}"
 
 if [[ "${ERROR_SORTMERNA}" -ne "0" ]]; then
-  email_comm "${sortmerna} --reads ${RAW_FASTA} -a ${NSLOTS} --ref ${DB}/rRNA_databases/silva-bac-16s-id90.fasta ...
+  email_comm "qsub -sync y -pe threaded ${NSLOTS} -N ${SMRNA_JOBID} ${sortmerna_runner}
 exited with RC ${ERROR_SORTMERNA} in job ${JOB_ID}."
   db_error_comm "sortmerna failed. Please contact adminitrator"
   cleanup && exit 2
