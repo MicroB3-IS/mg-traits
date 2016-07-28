@@ -102,13 +102,13 @@ EOF
   exit 1
 fi
 
-# rm -r ${THIS_JOB_TMP_DIR}  # CHANGE THIS FOR REAL DATA!!!!!!!!!! 
-#  echo "UPDATE mg_traits.mg_traits_jobs  SET return_code = 130 WHERE return_code = -1;" \
-#    | psql -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}"
-# 
-# rm -r /bioinf/projects/megx/scratch/mg-traits/failed_jobs/job*
-# rm -r /bioinf/projects/megx/scratch/mg-traits/running_jobs/job*
-# qdel -u megxnet
+rm -r ${THIS_JOB_TMP_DIR}  # CHANGE THIS FOR REAL DATA!!!!!!!!!! 
+ echo "UPDATE mg_traits.mg_traits_jobs  SET return_code = 130 WHERE return_code = -1;" \
+   | psql -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}"
+
+rm -r /bioinf/projects/megx/scratch/mg-traits/failed_jobs/job*
+rm -r /bioinf/projects/megx/scratch/mg-traits/running_jobs/job*
+qdel -u megxnet
 
 
 ###########################################################################################################
