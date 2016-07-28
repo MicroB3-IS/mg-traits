@@ -7,7 +7,6 @@ START_TIME=$(date +%s.%N)
 ##########################################################################################################
 # mg traits general variables
 ##########################################################################################################
-
 CONFIG="/bioinf/projects/megx/mg-traits/resources/config_files/config.bash"
 
 if [[ -r "${CONFIG}" ]]; then
@@ -126,11 +125,15 @@ fi
 ###########################################################################################################
 
 # rm -r ${THIS_JOB_TMP_DIR}  # CHANGE THIS FOR REAL DATA!!!!!!!!!! 
-# qdel -u megxnet  # CHANGE THIS FOR REAL DATA!!!!!!!!!! 
-# echo "UPDATE mg_traits.mg_traits_jobs  SET return_code = 130 WHERE return_code = -1;" \
-#   | psql -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}"
+ qdel -u megxnet  # CHANGE THIS FOR REAL DATA!!!!!!!!!! 
+ echo "UPDATE mg_traits.mg_traits_jobs  SET return_code = 130 WHERE return_code = -1;" \
+   | psql -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}"
 
-# rm -r /bioinf/projects/megx/scratch/mg-traits/running_jobs/job-83*  # CHANGE THIS FOR REAL DATA
+rm -r /bioinf/projects/megx/scratch/mg-traits/failed_jobs/job*
+rm -r /bioinf/projects/megx/scratch/mg-traits/running_jobs/job*
+
+qdel -u megxnet
+
 
 mkdir "${THIS_JOB_TMP_DIR}" && cd "${THIS_JOB_TMP_DIR}"
 if [[ "$?" -ne "0" ]]; then
@@ -268,9 +271,6 @@ fi
 #-sync y -pe threaded $NSLOTS  "${vsearch_runner}" "${RAW_FASTA}" "${UNIQUE}" "${UNIQUE_LOG}" "${NSLOTS}"
 
 #VSEARCH_ERROR_CODE="$?"
-
-#rm -r /bioinf/projects/megx/scratch/mg-traits/failed_jobs/job*
-#rm -r /bioinf/projects/megx/scratch/mg-traits/running_jobs/job*
 
 #if [[ "${CD_HIT_ERROR_CODE}" -ne "0" ]]; then 
 #  email_comm "${cd_hit_dup} -i ${RAW_FASTA} -o /dev/null > ${UNIQUE_LOG}
