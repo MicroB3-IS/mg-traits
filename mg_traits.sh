@@ -102,13 +102,13 @@ EOF
   exit 1
 fi
 
-rm -r ${THIS_JOB_TMP_DIR}  # CHANGE THIS FOR REAL DATA!!!!!!!!!! 
- echo "UPDATE mg_traits.mg_traits_jobs  SET return_code = 130 WHERE return_code = -1;" \
-   | psql -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}"
-
-rm -r /bioinf/projects/megx/scratch/mg-traits/failed_jobs/job*
-rm -r /bioinf/projects/megx/scratch/mg-traits/running_jobs/job*
-qdel -u megxnet
+# rm -r ${THIS_JOB_TMP_DIR}  # CHANGE THIS FOR REAL DATA!!!!!!!!!! 
+#  echo "UPDATE mg_traits.mg_traits_jobs  SET return_code = 130 WHERE return_code = -1;" \
+#    | psql -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}"
+# 
+# rm -r /bioinf/projects/megx/scratch/mg-traits/failed_jobs/job*
+# rm -r /bioinf/projects/megx/scratch/mg-traits/running_jobs/job*
+# qdel -u megxnet
 
 
 ###########################################################################################################
@@ -421,7 +421,7 @@ fi
 
 # -l ga -j y -terse -P megx.p -R y -m sa  -M "${mt_admin_mail}" -o "${THIS_JOB_TMP_DIR}" -e "${THIS_JOB_TMP_DIR}"  ... "${THIS_JOB_TMP_DIR}"
 
-qsub -sync y -pe threaded "${NSLOTS}" -N "${FINISHJOBID}" -o "${THIS_JOB_TMP_DIR}" -hold_jid "${FGS_JOBARRAYID}","${SINA_JOBARRAYID}" "${finish_runner}" "${THIS_JOB_TMP_DIR}"
+qsub -sync y -pe threaded "${NSLOTS}" -N "${FINISHJOBID}" -o "${THIS_JOB_TMP_DIR}" -hold_jid "${FGS_JOBARRAYID}","${SINA_JOBARRAYID}" "${finish_runner}" 
 
 if [[ "$?" -ne "0" ]]; then
   email_comm "qsub finish_runner.sh failed"
