@@ -419,10 +419,10 @@ fi
 # 4 - run finish traits
 ###########################################################################################################
 
-#-l ga -j y -terse -P megx.p -R y -m sa  -o "${THIS_JOB_TMP_DIR}" -wd "${THIS_JOB_TMP_DIR}"
+#
 
-qsub -sync y -pe threaded "${NSLOTS}" -N "${FINISHJOBID}" -M "${mt_admin_mail}" \
--hold_jid "${FGS_JOBARRAYID}","${SINA_JOBARRAYID}" "${finish_runner}" "${THIS_JOB_TMP_DIR}"
+qsub -sync y -pe threaded "${NSLOTS}" -N "${FINISHJOBID}" -M "${mt_admin_mail}" -l ga -j y -terse -P megx.p -R y -m sa  \
+-o "${THIS_JOB_TMP_DIR}" -e "${THIS_JOB_TMP_DIR}" -hold_jid "${FGS_JOBARRAYID}","${SINA_JOBARRAYID}" "${finish_runner}" "${THIS_JOB_TMP_DIR}"
 
 if [[ "$?" -ne "0" ]]; then
   email_comm "qsub finish_runner.sh failed"
