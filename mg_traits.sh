@@ -19,9 +19,6 @@ EOF
   exit 1
 fi
 
-qdel -u megxnet
-
-
 ##########################################################################################################
 # mg traits job specific variables
 ##########################################################################################################
@@ -426,7 +423,7 @@ fi
 #-l ga -j y -terse -P megx.p -R y -m sa  -o "${THIS_JOB_TMP_DIR}" -wd "${THIS_JOB_TMP_DIR}"
 
 qsub -sync y -pe threaded "${NSLOTS}" -N "${FINISHJOBID}" -M "${mt_admin_mail}" \
--hold_jid "${FGS_JOBARRAYID}","${SINA_JOBARRAYID}" "${finish_runner}" 
+-hold_jid "${FGS_JOBARRAYID}","${SINA_JOBARRAYID}" "${finish_runner2}" 
 
 if [[ "$?" -ne "0" ]]; then
   email_comm "qsub finish_runner.sh failed"
