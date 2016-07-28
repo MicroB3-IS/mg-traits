@@ -19,6 +19,8 @@ EOF
   exit 1
 fi
 
+qdel -u megxnet
+
 ##########################################################################################################
 # mg traits job specific variables
 ##########################################################################################################
@@ -420,9 +422,9 @@ fi
 # 4 - run finish traits
 ###########################################################################################################
 
-#-l ga -j y -terse -P megx.p -R y -m sa
+#-l ga -j y -terse -P megx.p -R y -m sa  -o "${THIS_JOB_TMP_DIR}" -wd "${THIS_JOB_TMP_DIR}"
 
-qsub -sync y -pe threaded "${NSLOTS}" -N "${FINISHJOBID}" -o "${THIS_JOB_TMP_DIR}" -wd "${THIS_JOB_TMP_DIR}" -M "${mt_admin_mail}" \
+qsub -sync y -pe threaded "${NSLOTS}" -N "${FINISHJOBID}" -M "${mt_admin_mail}" \
 -hold_jid "${FGS_JOBARRAYID}","${SINA_JOBARRAYID}" "${finish_runner}" 
 
 if [[ "$?" -ne "0" ]]; then
