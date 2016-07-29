@@ -380,7 +380,10 @@ fi
 module load sortmerna/2.0
 ##### load sortmerna module #####
 
-qsub -sync y -pe threaded "${NSLOTS}" -N "${SMRNA_JOBID}" "${sortmerna_runner}"
+# qsub -sync y -pe threaded "${NSLOTS}" -N "${SMRNA_JOBID}" "${sortmerna_runner}"
+
+qsub -t 1-"${NFILES}" -pe threaded "${NSLOTS}" -N "${SMRNA_JOBID}" "${sortmerna_runner2}"
+
 
 if [[ "${ERROR_SORTMERNA}" -ne "0" ]]; then
   email_comm "qsub -sync y -pe threaded ${NSLOTS} -N ${SMRNA_JOBID} ${sortmerna_runner}
@@ -401,10 +404,12 @@ fi
 # 3 - run SINA
 ###########################################################################################################
 
-awk -vn="${nSEQ}" 'BEGIN {n_seq=0;partid=1;} /^>/ {if(n_seq%n==0){file=sprintf("06-part-%d.fasta",partid);partid++;} print >> file; n_seq++; next;} { print >> file; }' < "${SORTMERNA_OUT}".fasta
-nFILES=$( find . -name "06-part*.fasta" | wc -l)
+# awk -vn="${nSEQ}" 'BEGIN {n_seq=0;partid=1;} /^>/ {if(n_seq%n==0){file=sprintf("06-part-%d.fasta",partid);partid++;} print >> file; n_seq++; next;} { print >> file; }' < "${SORTMERNA_OUT}".fasta
+# nFILES=$( find . -name "06-part*.fasta" | wc -l)
 
-qsub -pe threaded "${NSLOTS}" -t 1-"${nFILES}" -N "${SINA_JOBARRAYID}" "${sina_runner}"
+# qsub -t 1-"${nFILES}" -pe threaded "${NSLOTS}" -hold_jid "${SMRNA_JOBID}" -N "${SINA_JOBARRAYID}" "${sina_runner}"
+
+qsub -t 1-"${NFILES}" -pe threaded "${NSLOTS}" -hold_jid "${SMRNA_JOBID}" -N "${SINA_JOBARRAYID}" "${sina_runner}"
 
 ERROR_SINA=$?
 
