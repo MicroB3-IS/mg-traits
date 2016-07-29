@@ -110,6 +110,7 @@ fi
 # rm -r /bioinf/projects/megx/scratch/mg-traits/running_jobs/job*
 # qdel -u megxnet
 
+qdel 850171 850182
 
 ###########################################################################################################
 # 1 - Check database connection
