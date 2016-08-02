@@ -325,6 +325,15 @@ GC=$(cut -f2 "${INFOSEQ_MGSTATS}" -d ' ');
 VARGC=$(cut -f3 "${INFOSEQ_MGSTATS}" -d ' ')
 printf "Number of bases: %d\nGC content: %f\nGC variance: %f\n" "${NUM_BASES}" "${GC}" "${VARGC}"
 
+###########################################################################################################
+# Split original
+###########################################################################################################
+
+awk -vn="${NSEQ}" 'BEGIN {n_seq=0;partid=1;} /^>/ {if(n_seq%n==0){file=sprintf("05-part-%d.fasta",partid);partid++;} print >> file; n_seq++; next;} { print >> file; }' < "${RAW_FASTA}"
+NFILES=$(find . -name "05-part*.fasta" | wc -l)
+
+# redefine evalue for sormerna
+eval=$( echo 1 / $(find . -name "05-part-[0-9]*.fasta" | wc -l) | bc -l)
 
 ###########################################################################################################
 # define environment for sub jobs
@@ -349,16 +358,13 @@ SINA_LOG_DIR="${SINA_LOG_DIR}"
 target_db_user="${target_db_user}"
 target_db_host="${target_db_host}"
 target_db_port="${target_db_port}"
-target_db_name="${target_db_name}"  
+target_db_name="${target_db_name}"
+eval="${eval}"
 EOF
 
 ###########################################################################################################
 # 1 - run fgs
 ###########################################################################################################
-
-#Split original
-awk -vn="${NSEQ}" 'BEGIN {n_seq=0;partid=1;} /^>/ {if(n_seq%n==0){file=sprintf("05-part-%d.fasta",partid);partid++;} print >> file; n_seq++; next;} { print >> file; }' < "${RAW_FASTA}"
-NFILES=$(find . -name "05-part*.fasta" | wc -l)
 
 qsub -t 1-"${NFILES}" -pe threaded "${NSLOTS}" -N "${FGS_JOBARRAYID}" "${fgs_runner}"
 
