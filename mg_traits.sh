@@ -280,7 +280,7 @@ fi
 #### ONLY FOR TARA!!!! ######
 MG_URL_LOG=${MG_URL/pre-process.SR.*.fasta/pre-process.SR_vsearch.log}
 curl -s "${MG_URL_LOG}" > pre-process.SR_vsearch.log
-NUM_READS=$( sed -n 3p pre-process.SR_vsearch.log | cut -f10 -d" " )
+NUM_READS=$( egrep -o  "in\ [0-9]+\ seqs" pre-process.SR_vsearch.log | awk '{ print $2 }' )
 #### ONLY FOR TARA!!!! ######
 
 #NUM_READS=$(grep 'Total number of sequences:'  "${UNIQUE_LOG}" | awk '{print $(NF)}')
