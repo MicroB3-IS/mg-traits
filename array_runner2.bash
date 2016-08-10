@@ -7,14 +7,14 @@
 
 NSLOTS=4
 SGE_TASK_ID=44
-LABELS_LIST="/bioinf/projects/megx/mg-traits/resources/139_prokrich.txt"
+LABELS_LIST="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/139_prokrich.txt"
 SAMPLE_LABEL=$( awk -v L="${SGE_TASK_ID}" 'NR==L' "${LABELS_LIST}" );
 
 ###########################################################################################################
 # 1 - Preprocess data
 ###########################################################################################################
 PREPROCESS_DIR="/bioinf/projects/megx/mg-traits/TARA_crunch/preprocess_data"
-preprocess="/bioinf/projects/megx/mg-traits/resources/bin/preprocess_runner.sh"
+preprocess="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/bin/preprocess_runner.sh"
 PREPROCESSJOB="mt-preprocess"
 mt_admin_mail="epereira@mpi-bremen.de"
 
