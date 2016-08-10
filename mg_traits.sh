@@ -7,7 +7,7 @@ START_TIME=$(date +%s.%N)
 ##########################################################################################################
 # mg traits general variables
 ##########################################################################################################
-CONFIG="/bioinf/projects/megx/mg-traits/resources/config_files/config.bash"
+CONFIG="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/config_files/config.bash"
 
 if [[ -r "${CONFIG}" ]]; then
   source "${CONFIG}"
@@ -91,7 +91,7 @@ done
 # Load functions: Only after all the variables have been defined
 ##########################################################################################################
 
-FUNCTIONS="/bioinf/projects/megx/mg-traits/resources/config_files/config.bash"
+FUNCTIONS="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/config_files/config.bash"
 
 if [[ -r "${FUNCTIONS}" ]]; then
   source "${FUNCTIONS}"
