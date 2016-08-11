@@ -157,43 +157,69 @@ fi
 ###########################################################################################################
 # 3 - Download file from MG URL
 ###########################################################################################################
+# 
+# # validate MG URL 
+# echo "${MG_URL}"
+# REGEX='(https?|ftp|file)://[-A-Za-z0-9\+&@#/%?=~_|!:,.;]*[-A-Za-z0-9\+&@#/%=~_|]'
+#   
+# if [[ ! ${MG_URL} =~ ${REGEX} ]]; then
+#   email_comm "Invalid URL ${MG_URL} output db: ${DB_COM} ${SAMPLE_LABEL}"
+#   db_error_comm "Not valid URL: ${MG_URL}";
+#   cleanup && exit 1
+# fi 
+# 
+# # check if it already exist on our DB            
+# if [[ "${SAMPLE_LABEL}" != "test_label" ]]; then
+#   URLDB=$(psql -t -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}" -c \
+#   "SELECT count(*) FROM mg_traits.mg_traits_jobs where mg_url = '${MG_URL}' AND sample_label NOT ILIKE 'test_label AND return_code = 0'")
+#     
+#   if [[ "${URLDB}" -gt 1 ]]; then 
+#      email_comm "The URL ${MG_URL} has been already succesfully crunched. If the file is different please change the file name"
+#      db_error_comm "The URL ${MG_URL} has been already succesfully crunched. If the file is different please change the file name."
+#      cleanup && exit 1
+#   fi 
+# fi
+# 
+# # # download MG_URL
+# curl -s "${MG_URL}" > "${RAW_DOWNLOAD}"
+# 
+# if [[ "$?" -ne "0" ]]; then 
+#   email_comm "Could not retrieve ${MG_URL}"
+#   db_error_comm  "Could not retrieve ${MG_URL}"
+#   cleanup && exit 1
+# fi
+# 
+# # compress data
+# gunzip -qc "${RAW_DOWNLOAD}" > "${RAW_FASTA}"
+# if [[ "$?" -ne "0" ]]; then 
+#   echo "File was uncompressed"
+#   rm "${RAW_FASTA}"; mv "${RAW_DOWNLOAD}" "${RAW_FASTA}" # NEEDS REVIEW: TRAP AND DB COMMUNICATION?
+# fi
+# 
+###########################################################################################################
+# 4 - Preprocess data
+###########################################################################################################
 
-# validate MG URL 
-echo "${MG_URL}"
-REGEX='(https?|ftp|file)://[-A-Za-z0-9\+&@#/%?=~_|!:,.;]*[-A-Za-z0-9\+&@#/%=~_|]'
-  
-if [[ ! ${MG_URL} =~ ${REGEX} ]]; then
-  email_comm "Invalid URL ${MG_URL} output db: ${DB_COM} ${SAMPLE_LABEL}"
-  db_error_comm "Not valid URL: ${MG_URL}";
-  cleanup && exit 1
-fi 
+PREPROCESSJOB="mt-${JOB_ID}-preprocess"
+preprocess="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/bin/preprocess_runner2.sh"
 
-# check if it already exist on our DB            
-if [[ "${SAMPLE_LABEL}" != "test_label" ]]; then
-  URLDB=$(psql -t -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}" -c \
-  "SELECT count(*) FROM mg_traits.mg_traits_jobs where mg_url = '${MG_URL}' AND sample_label NOT ILIKE 'test_label AND return_code = 0'")
-    
-  if [[ "${URLDB}" -gt 1 ]]; then 
-     email_comm "The URL ${MG_URL} has been already succesfully crunched. If the file is different please change the file name"
-     db_error_comm "The URL ${MG_URL} has been already succesfully crunched. If the file is different please change the file name."
-     cleanup && exit 1
-  fi 
-fi
+cat > 00-preprocess_env << EOF
+SAMPLE_LABEL="${SAMPLE_LABEL}" 
+MG_ID="${MG_ID}" 
+target_db_user="${target_db_user}" 
+target_db_host="${target_db_host}" 
+target_db_port="${target_db_port}" 
+target_db_name="${target_db_name}" 
+THIS_JOB_TMP_DIR="${THIS_JOB_TMP_DIR}"
+EOF
 
-# # download MG_URL
-curl -s "${MG_URL}" > "${RAW_DOWNLOAD}"
+qsub -sync y -pe threaded "${NSLOTS}" -N "${PREPROCESSJOB}" -M "${mt_admin_mail}" -o "${THIS_JOB_TMP_DIR}" -wd "${THIS_JOB_TMP_DIR}" -j y \
+"${preprocess}" "${SAMPLE_LABEL}"
 
-if [[ "$?" -ne "0" ]]; then 
-  email_comm "Could not retrieve ${MG_URL}"
-  db_error_comm  "Could not retrieve ${MG_URL}"
-  cleanup && exit 1
-fi
-
-# compress data
-gunzip -qc "${RAW_DOWNLOAD}" > "${RAW_FASTA}"
-if [[ "$?" -ne "0" ]]; then 
-  echo "File was uncompressed"
-  rm "${RAW_FASTA}"; mv "${RAW_DOWNLOAD}" "${RAW_FASTA}" # NEEDS REVIEW: TRAP AND DB COMMUNICATION?
+if [[ $? -ne "0" ]]; then
+  email_comm "failed preprocess ${preprocess}"
+  db_error_comm "failed preprocess ${preprocess}"
+  exit 2; 
 fi
 
 ###########################################################################################################
@@ -277,7 +303,7 @@ fi
 #  cleanup && exit 2;
 #fi
 
-#### ONLY FOR TARA!!!! ######
+#### O	NLY FOR TARA!!!! ######
 MG_URL_LOG=${MG_URL/pre-process.SR.*.fasta/pre-process.SR_vsearch.log}
 curl -s "${MG_URL_LOG}" > pre-process.SR_vsearch.log
 NUM_READS=$( egrep -o  "in\ [0-9]+\ seqs" pre-process.SR_vsearch.log | awk '{ print $2 }' )
