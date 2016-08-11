@@ -222,6 +222,15 @@ if [[ $? -ne "0" ]]; then
   exit 2; 
 fi
 
+#### change label to avoid successful_jobs_key conflic
+RANDOM_STRING=$(date +%s.%N | sha256sum | base64 | head -c 10 ; echo )
+RANDOM_LABEL="${SAMPLE_LABEL}_${RANDOM_STRING}"
+
+echo "UPDATE mg_traits.mg_traits_jobs SET sample_label = '${RANDOM_LABEL}' WHERE sample_label = '${SAMPLE_LABEL}' AND id = '${MG_ID}';" | \
+ppsql -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}"
+
+SAMPLE_LABEL="${RANDOM_LABEL}"
+
 ###########################################################################################################
 # 4 -  Validate file
 ###########################################################################################################
