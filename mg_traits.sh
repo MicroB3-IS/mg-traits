@@ -1,4 +1,6 @@
 #!/bin/bash
+#$ -l mg_traits=1
+
 set -x
 set -o pipefail
 
