@@ -103,12 +103,12 @@ EOF
 fi
 
 # rm -r ${THIS_JOB_TMP_DIR}  # CHANGE THIS FOR REAL DATA!!!!!!!!!! 
-#  echo "UPDATE mg_traits.mg_traits_jobs  SET return_code = 130 WHERE return_code = -1;" \
-#    | psql -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}"
-# 
-# rm -r /bioinf/projects/megx/scratch/mg-traits/failed_jobs/job*
-# rm -r /bioinf/projects/megx/scratch/mg-traits/running_jobs/job*
-# qdel -u megxnet
+ echo "UPDATE mg_traits.mg_traits_jobs  SET return_code = 130 WHERE return_code = -1;" \
+   | psql -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}"
+
+rm -r /bioinf/projects/megx/scratch/mg-traits/failed_jobs/job*
+rm -r /bioinf/projects/megx/scratch/mg-traits/running_jobs/job*
+qdel -u megxnet
 
 ###########################################################################################################
 # 1 - Check database connection
@@ -304,8 +304,8 @@ fi
 #fi
 
 #### O	NLY FOR TARA!!!! ######
-MG_URL_LOG=${MG_URL/pre-process.SR.*.fasta/pre-process.SR_vsearch.log}
-curl -s "${MG_URL_LOG}" > pre-process.SR_vsearch.log
+# MG_URL_LOG=${MG_URL/pre-process.SR.*.fasta/pre-process.SR_vsearch.log}
+# curl -s "${MG_URL_LOG}" > pre-process.SR_vsearch.log
 NUM_READS=$( egrep -o  "in\ [0-9]+\ seqs" pre-process.SR_vsearch.log | awk '{ print $2 }' )
 #### ONLY FOR TARA!!!! ######
 
