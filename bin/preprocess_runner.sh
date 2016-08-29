@@ -25,7 +25,7 @@ pear="/bioinf/software/pear/pear-0.9.8/bin/pear"
 # bbduk
 bbduk="/bioinf/software/bbmap/bbmap-35.14/bbduk.sh"
 # vsearch
-vsearch_runner="/bioinf/projects/megx/mg-traits/resources/bin/vsearch_runner.sh"
+vsearch_runner="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/bin/vsearch_runner.sh"
 # db communication
 target_db_user=epereira
 target_db_host=antares
@@ -36,7 +36,7 @@ target_db_name=megdb_r8
 mt_admin_mail=epereira@mpi-bremen.de
 
 # declare AFILE="/bioinf/projects/megx/TARA/rDNAs/compute/input/assem-file-name2url.txt"
-declare AFILE="/bioinf/projects/megx/mg-traits/resources/assem-file-name2url.txt"
+declare AFILE="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/assem-file-name2url.txt"
 
 ######################################
 # Functions
@@ -90,8 +90,8 @@ echo "${RFILES}" | \
     while read LINE
     do
         N=$(basename "${LINE}")
-        ln -s "/bioinf/projects/megx/TARA/assemblies/FASTQ/${N}" .
-        #ln -s "/bioinf/home/epereira/workspace/mg-traits/tara_prepross/data/toyFASTQ/${N}" .
+        #ln -s "/bioinf/projects/megx/TARA/assemblies/FASTQ/${N}" .
+        ln -s "/bioinf/home/epereira/workspace/mg-traits/tara_prepross/data/toyFASTQ/${N}" .
     done
 
 echo "UPDATE epereira.preprocess_jobs SET mg_url = '${RFILES}' WHERE sample_label = '${SAMPLE_LABEL}' AND  job_id = '${JOB_ID}';" | \

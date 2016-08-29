@@ -8,7 +8,6 @@
 INFILE=$1
 OUTFILE=$2
 LOG=$3
-NSLOTS=$4
 
 ##### load vsearch module #####
 source /bioinf/software/etc/profile.modules

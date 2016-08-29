@@ -6,8 +6,8 @@ export https_proxy="https://webproxy.mpi-bremen.de:3128"
 
 ## folders
 #mg_traits_dir="/bioinf/projects/megx/mg-traits/bin"
-RESOURCES_BIN="/bioinf/projects/megx/mg-traits/resources/bin"
-RESOURCES="/bioinf/projects/megx/mg-traits/resources"
+RESOURCES="/bioinf/projects/megx/mg-traits/mg-traits_github_floder"
+RESOURCES_BIN="${RESOURCES}/bin"
 temp_dir="/bioinf/projects/megx/scratch/mg-traits"
 job_out_dir="/vol/tmp/megx/"
 

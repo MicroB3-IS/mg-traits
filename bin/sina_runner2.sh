@@ -3,8 +3,8 @@
 #$ -j y 
 
 source ./01-subjobs_env
-source /bioinf/projects/megx/mg-traits/resources/config_files/config.bash
-source /bioinf/projects/megx/mg-traits/resources/config_files/config.functions.bash
+source /bioinf/projects/megx/mg-traits/mg-traits_github_floder/config_files/config.bash
+source /bioinf/projects/megx/mg-traits/mg-traits_github_floder/config_files/config.functions.bash
 
 ############################
 # sina files

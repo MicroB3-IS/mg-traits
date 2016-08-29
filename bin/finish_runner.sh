@@ -21,8 +21,8 @@ fi
 # 0.1 - Doad variables
 ##########################################################################################################
 
-CONFIG="/bioinf/projects/megx/mg-traits/resources/config_files/config.bash"
-CONFIG_FINISH="/bioinf/projects/megx/mg-traits/resources/config_files/config_finish.bash"
+CONFIG="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/config_files/config.bash"
+CONFIG_FINISH="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/config_files/config_finish.bash"
 SUBJOBS_ENV="./01-subjobs_env"
 
 if [[ -r "${CONFIG}" && -r "${CONFIG_FINISH}" && -r "${SUBJOBS_ENV}" ]]; then
@@ -40,7 +40,7 @@ fi
 # 0.2 - Define function
 #####################################################################################################
 
-FUNCTIONS="/bioinf/projects/megx/mg-traits/resources/config_files/config.functions.bash"
+FUNCTIONS="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/config_files/config.functions.bash"
 
 if [[ -r "${FUNCTIONS}" ]]; then
   source "${FUNCTIONS}"
