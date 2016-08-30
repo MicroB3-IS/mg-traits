@@ -104,14 +104,6 @@ EOF
   exit 1
 fi
 
-# rm -r ${THIS_JOB_TMP_DIR}  # CHANGE THIS FOR REAL DATA!!!!!!!!!! 
-# echo "UPDATE mg_traits.mg_traits_jobs  SET return_code = 130 WHERE return_code = -1;" \
-# | psql -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}"
-# 
-# rm -r /bioinf/projects/megx/scratch/mg-traits/failed_jobs/job*
-# rm -r /bioinf/projects/megx/scratch/mg-traits/running_jobs/job*
-# qdel -u megxnet
-
 ###########################################################################################################
 # 1 - Check database connection
 ###########################################################################################################
@@ -314,7 +306,7 @@ fi
 #  cleanup && exit 2;
 #fi
 
-#### O	NLY FOR TARA!!!! ######
+#### ONLY FOR TARA!!!! ######
 # MG_URL_LOG=${MG_URL/pre-process.SR.*.fasta/pre-process.SR_vsearch.log}
 # curl -s "${MG_URL_LOG}" > pre-process.SR_vsearch.log
 NUM_READS=$( egrep -o  "in\ [0-9]+\ seqs" 01-raw_SR_vsearch.log | awk '{ print $2 }' )
@@ -418,8 +410,6 @@ fi
 ## 2 - run sortmerna
 ############################################################################################################
 
-# qsub -sync y -pe threaded "${NSLOTS}" -N "${SMRNA_JOBID}" "${sortmerna_runner}"
-
 qsub -t 1-"${NFILES}" -pe threaded "${NSLOTS}" -N "${SMRNA_JOBID}" "${sortmerna_runner2}"
 
 
@@ -441,11 +431,6 @@ fi
 ###########################################################################################################
 # 3 - run SINA
 ###########################################################################################################
-
-# awk -vn="${nSEQ}" 'BEGIN {n_seq=0;partid=1;} /^>/ {if(n_seq%n==0){file=sprintf("06-part-%d.fasta",partid);partid++;} print >> file; n_seq++; next;} { print >> file; }' < "${SORTMERNA_OUT}".fasta
-# nFILES=$( find . -name "06-part*.fasta" | wc -l)
-
-# qsub -t 1-"${nFILES}" -pe threaded "${NSLOTS}" -hold_jid "${SMRNA_JOBID}" -N "${SINA_JOBARRAYID}" "${sina_runner}"
 
 qsub -t 1-"${NFILES}" -pe threaded "${NSLOTS}" -hold_jid "${SMRNA_JOBID}" -N "${SINA_JOBARRAYID}" "${sina_runner}"
 
@@ -483,13 +468,5 @@ echo "UPDATE mg_traits.mg_traits_jobs SET total_run_time = total_run_time + ${RU
 || ('${JOB_ID}', 'mg_traits', ${RUN_TIME})::mg_traits.time_log_entry WHERE sample_label = '${SAMPLE_LABEL}' AND id = '${MG_ID}';" \
 | psql -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}"
 
-###########################################################################################################
-# 6 remove or compress data 
-###########################################################################################################
-
-# FILE=$( echo "SELECT mg_url FROM mg_traits.mg_traits_jobs WHERE label=' ${SAMPLE_LABEL}' AND id = '${MG_ID}'" \ |
-# | psql -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}" )
-# FILE=$(echo $FILE | sed 's/file:\/\///')
-# rm $FILE
 
 
