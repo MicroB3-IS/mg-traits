@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # FastaValidator exit codes
 # 0    valid input
 # 1    unknown error
