@@ -6,16 +6,111 @@ set -o pipefail
 
 START_TIME=$(date +%s.%N)
 
+###########################################################################################################
+# 0 - Parse parameters
+###########################################################################################################
+# todo: check all variables are defined if not exit with message
+
+if [[ -z "$1" ]]; then
+  echo "no input data"  
+  exit 2
+fi
+
+# in case we do not get JOB_ID from an SGE like environment
+if [[ -z "${JOB_ID}" ]]; then
+  JOB_ID=$(date +%s.%N | sha256sum | base64 | head -c 10 )
+fi
+echo "JOB ID=${JOB_ID}"
+
+# urldecode input
+declare -r INPUT=$(echo "$1" | sed -e 's/&/|/g' -e 's/\+/ /g' -e 's/%25/%/g' -e 's/%20/ /g' -e 's/%09/ /g' -e 's/%21/!/g' \
+-e 's/%22/"/g' -e 's/%23/#/g' -e 's/%24/\$/g' -e 's/%26/\&/g' -e 's/%27/'\''/g' -e 's/%28/(/g' -e 's/%29/)/g' \
+-e 's/%2a/\*/g' -e 's/%2b/+/g' -e 's/%2c/,/g' -e 's/%2d/-/g' -e 's/%2e/\./g' -e 's/%2f/\//g' -e 's/%3a/:/g' \
+-e 's/%3b/;/g' -e 's/%3d/=/g' -e 's/%3e//g' -e 's/%3f/?/g' -e 's/%40/@/g' -e 's/%5b/\[/g' -e 's/%5c/\\/g' \
+-e 's/%5d/\]/g' -e 's/%5e/\^/g' -e 's/%5f/_/g' -e 's/%60/`/g' -e 's/%7b/{/g' -e 's/%7c/|/g' -e 's/%7d/}/g' \
+-e 's/%7e/~/g' -e 's/%09/      /g')
+
+# set delimiter: change the "&" to "|" and then set IFS="|" so that it can be used in the for loop. 
+IFS="|"
+
+# parse input
+for pair in "${INPUT}"; do
+  key=${pair%%=*}
+  value=${pair#*=}
+
+  if [[ "${key}" = "sample_label" ]]; then 
+    SAMPLE_LABEL="${value}";
+  else
+    error_exit "Mandatory Sample label not defined" 6
+  fi
+
+  if [[ "${key}" = "mg_url" ]]; then
+    MG_URL="${value}";
+  else
+    error_exit "Mandatory metagenome URL not defined" 6
+  fi
+
+  if [[ "${key}" = "customer" ]]; then
+    CUSTOMER="${value}";
+  else
+    error_exit "Mandatory user name not defined" 6
+  fi
+
+  if [[ "${key}" = "sample_environment" ]]; then
+    SAMPLE_ENVIRONMENT="${value}";
+  else
+    error_exit "Mandatory environment name not defined" 6
+  fi
+
+  if [[ "${key}" = "time_submitted" ]]; then
+    SUBMIT_TIME="${value}";
+  fi
+
+  if [[ "${key}" = "make_public" ]]; then
+    MAKE_PUBLIC="${value}";
+  fi
+
+  if [[ "${key}" = "keep_data" ]]; then
+    KEEP_DATA="${value}";
+  fi
+
+  if [[ "${key}" = "id" ]]; then
+    MG_ID="${value}";
+  else
+    error_exit "Mandatory Sample label not defined" 6
+  fi
+
+done
+
+unset IFS
+
 ##########################################################################################################
-# mg traits general variables
+# Load general configuration
 ##########################################################################################################
-CONFIG="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/config_files/config.bash"
+# todo: add path as a variable
+
+CONFIG="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/conf/mg-traits.conf"
 
 if [[ -r "${CONFIG}" ]]; then
   source "${CONFIG}"
 else
   mail -s "mg_traits:${JOB_ID} failed" epereira@mpi-bremen.de <<EOF
 "No "${CONFIG} file"
+EOF
+  exit 1
+fi
+
+##########################################################################################################
+# Load functions: Only after all the variables have been defined
+##########################################################################################################
+
+FUNCTIONS="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/conf/mg-traits.functions.sh"
+
+if [[ -r "${FUNCTIONS}" ]]; then
+  source "${FUNCTIONS}"
+else
+  mail -s "mg_traits:${JOB_ID} failed" "${mt_admin_mail}" <<EOF
+"No ${FUNCTIONS} file"
 EOF
   exit 1
 fi
@@ -31,122 +126,65 @@ SMRNA_JOBID="mt-${JOB_ID}-smrna"
 SINA_JOBARRAYID="mt-${JOB_ID}-sina"
 FINISHJOBID="mt-${JOB_ID}-finish"
 TMP_VOL_FILE="/vol/tmp/megx/${JOB_NAME}.${JOB_ID}"
+
+# todo: move these folders to resources and set variables in conf file
 PFAM_ACCESSIONS="${THIS_JOB_TMP_DIR}/data/pfam28_acc.txt"
 TFFILE="${THIS_JOB_TMP_DIR}/data/TF.txt"
 SLV_FILE="${THIS_JOB_TMP_DIR}/data/silva_tax_order_115.txt"
 
 ###########################################################################################################
-# 0 - Parse parameters
+# 1 - Check database connection by setting starting time
 ###########################################################################################################
+if [[ -n "${target_db_name}" ]]; then
+  DB_RESULT=$( \
+    echo "UPDATE mg_traits.mg_traits_jobs SET time_started = now(), \
+          job_id = ${JOB_ID}, cluster_node = \
+          '${HOSTNAME}' \
+          WHERE sample_label = '${SAMPLE_LABEL}' \
+            AND id = ${MG_ID};" \
+         | psql -U "${target_db_user}" -h "${target_db_host}" \
+                -p "${target_db_port}" -d "${target_db_name}" \
+  )
+  if [[ "$?" -ne "0" ]]; then
+    error_exit "Cannot connect to database. Output:${DB_RESULT}" 2
+  fi
 
-# urldecode input
-string=$(echo "$1" | sed -e 's/&/|/g' -e 's/\+/ /g' -e 's/%25/%/g' -e 's/%20/ /g' -e 's/%09/ /g' -e 's/%21/!/g' \
--e 's/%22/"/g' -e 's/%23/#/g' -e 's/%24/\$/g' -e 's/%26/\&/g' -e 's/%27/'\''/g' -e 's/%28/(/g' -e 's/%29/)/g' \
--e 's/%2a/\*/g' -e 's/%2b/+/g' -e 's/%2c/,/g' -e 's/%2d/-/g' -e 's/%2e/\./g' -e 's/%2f/\//g' -e 's/%3a/:/g' \
--e 's/%3b/;/g' -e 's/%3d/=/g' -e 's/%3e//g' -e 's/%3f/?/g' -e 's/%40/@/g' -e 's/%5b/\[/g' -e 's/%5c/\\/g' \
--e 's/%5d/\]/g' -e 's/%5e/\^/g' -e 's/%5f/_/g' -e 's/%60/`/g' -e 's/%7b/{/g' -e 's/%7c/|/g' -e 's/%7d/}/g' \
--e 's/%7e/~/g' -e 's/%09/      /g')
-
-# set delimiter
-IFS="|"
-
-# parse input
-for pair in $string; do
-key=${pair%%=*}
-value=${pair#*=}
-
-if [[ "${key}" = "sample_label" ]]; then
-	SAMPLE_LABEL="${value}";
+  if [[ "${DB_RESULT}" != "UPDATE 1" ]]; then
+    error_exit "sample name ${SAMPLE_LABEL} is not in database Result:${DB_RESULT}" 2
+  fi
 fi
+  
 
-if [[ "${key}" = "mg_url" ]]; then
-	MG_URL="${value}";
-fi
-
-if [[ "${key}" = "customer" ]]; then
-	CUSTOMER="${value}";
-fi
-
-if [[ "${key}" = "sample_environment" ]]; then
-	SAMPLE_ENVIRONMENT="${value}";
-fi
-
-if [[ "${key}" = "time_submitted" ]]; then
-	SUBMIT_TIME="${value}";
-fi
-
-if [[ "${key}" = "make_public" ]]; then
-	MAKE_PUBLIC="${value}";
-fi
-
-if [[ "${key}" = "keep_data" ]]; then
-	KEEP_DATA="${value}";
-fi
-
-if [[ "${key}" = "id" ]]; then
-	MG_ID="${value}";
-fi
-
-done
-
-##########################################################################################################
-# Load functions: Only after all the variables have been defined
-##########################################################################################################
-
-FUNCTIONS="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/config_files/config.bash"
-
-if [[ -r "${FUNCTIONS}" ]]; then
-  source "${FUNCTIONS}"
-else
-  mail -s "mg_traits:${JOB_ID} failed" "${mt_admin_mail}" <<EOF
-"No ${FUNCTIONS} file"
-EOF
-  exit 1
-fi
-
-###########################################################################################################
-# 1 - Check database connection
-###########################################################################################################
-
-DB_RESULT=$( echo "UPDATE mg_traits.mg_traits_jobs SET time_started = now(), job_id = ${JOB_ID}, cluster_node = \
-'${HOSTNAME}' WHERE sample_label = '${SAMPLE_LABEL}' AND id = ${MG_ID};" | psql -U "${target_db_user}" -h \
-"${target_db_host}" -p "${target_db_port}" -d "${target_db_name}" )
-
-if [[ "$?" -ne "0" ]]; then
-  email_comm "Cannot connect to database. Output:${DB_RESULT}"
-  cleanup && exit 2
-fi
-
-if [[ "${DB_RESULT}" != "UPDATE 1" ]]; then
-  email_comm "sample name ${SAMPLE_LABEL} is not in database Result:${DB_RESULT}"  
-  cleanup && exit 2
-fi
 
 ###########################################################################################################
 # 2 - Create job directory
 ###########################################################################################################
 
-
-mkdir "${THIS_JOB_TMP_DIR}" && cd "${THIS_JOB_TMP_DIR}"
+mkdir "${THIS_JOB_TMP_DIR}"
 if [[ "$?" -ne "0" ]]; then
- email_comm  "Could not access job temp dir ${THIS_JOB_TMP_DIR} in $(pwd)"
- db_error_comm "Could not access job temp dir ${THIS_JOB_TMP_DIR}"
- cleanup && exit 2; 
+  db_error_comm "Could not access job temp dir ${THIS_JOB_TMP_DIR}"
+  error_exit  "Could not access job temp dir ${THIS_JOB_TMP_DIR}" 3
 fi
 
 mkdir "${THIS_JOB_TMP_DIR_DATA}" && mkdir "${SINA_LOG_DIR}"
 if [[ "$?" -ne "0" ]]; then
- email_comm  "Could not create data temp dir ${THIS_JOB_TMP_DIR_DATA} in $(pwd)"
  db_error_comm "Could not create data temp dir ${THIS_JOB_TMP_DIR_DATA}"
- cleanup && exit 2; 
+ error_exit "Could not create data temp dir ${THIS_JOB_TMP_DIR_DATA}" 4
 fi
 
+###########################################################################################################
+# 5 - Check for utilities and directories
+###########################################################################################################
 
-if [[ "$(pwd)" != "${THIS_JOB_TMP_DIR}" ]]; then
- email_comm  "Could not access job temp dir ${THIS_JOB_TMP_DIR} in $(pwd)"
- db_error_comm "Could not access job temp dir ${THIS_JOB_TMP_DIR}"
- cleanup && exit 2; 
-fi
+ERROR_MESSAGE=$(\
+  check_required_writable_directories "${temp_dir:?}" \
+    "${RUNNING_JOBS_DIR:?}" \
+    "${FAILED_JOBS_DIR:?}" \
+    "${job_out_dir:?}";
+  check_required_readable_directories "${mg_traits_dir:?}";
+  check_required_programs "${vsearch}" "${uproc}" "${r_interpreter:?}" "${sina:?}" "${frag_gene_scan:?}" "${sortmerna:?}";\
+)
+
 
 ###########################################################################################################
 # 3 - Download file from MG URL
@@ -189,68 +227,15 @@ fi
 #   echo "File was uncompressed"
 #   rm "${RAW_FASTA}"; mv "${RAW_DOWNLOAD}" "${RAW_FASTA}" # NEEDS REVIEW: TRAP AND DB COMMUNICATION?
 # fi
-# 
-###########################################################################################################
-# 4 - Preprocess data
-###########################################################################################################
-
-PREPROCESSJOB="mt-${JOB_ID}-preprocess"
-preprocess="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/bin/preprocess_runner2.sh"
-
-cat > 00-preprocess_env << EOF
-SAMPLE_LABEL="${SAMPLE_LABEL}" 
-MG_ID="${MG_ID}" 
-target_db_user="${target_db_user}" 
-target_db_host="${target_db_host}" 
-target_db_port="${target_db_port}" 
-target_db_name="${target_db_name}" 
-THIS_JOB_TMP_DIR="${THIS_JOB_TMP_DIR}"
-EOF
-
-qsub -sync y -pe threaded "${NSLOTS}" -N "${PREPROCESSJOB}" -M "${mt_admin_mail}" -o "${THIS_JOB_TMP_DIR}" -wd "${THIS_JOB_TMP_DIR}" -j y \
-"${preprocess}" "${SAMPLE_LABEL}"
-
-if [[ $? -ne "0" ]]; then
-  email_comm "failed preprocess ${preprocess}"
-  db_error_comm "failed preprocess ${preprocess}"
-  exit 2; 
-fi
-
-#### change label to avoid successful_jobs_key conflic
-RANDOM_STRING=$(date +%s.%N | sha256sum | base64 | head -c 10 ; echo )
-RANDOM_LABEL="${SAMPLE_LABEL}_${RANDOM_STRING}"
-
-echo "UPDATE mg_traits.mg_traits_jobs SET sample_label = '${RANDOM_LABEL}' WHERE sample_label = '${SAMPLE_LABEL}' AND id = '${MG_ID}';" | \
-psql -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}"
-
-SAMPLE_LABEL="${RANDOM_LABEL}"
-
+#
+    
 ###########################################################################################################
 # 4 -  Validate file
 ###########################################################################################################
 
-"${fasta_file_check}" "${RAW_FASTA}" "${FASTA_BAD}"
-FASTA_ERROR_CODE="$?"
+## TODO: wait for antonios script
 
-if [[ "${FASTA_ERROR_CODE}" -ne "0" ]]; then
-  FASTA_BAD_HEADER=$(grep '>' "${FASTA_BAD}" | tr -d '>'); 
-  
-  email_comm "${MG_URL} is not a valid FASTA file. FASTA validation failed at sequence ${FASTA_BAD_HEADER}, error: \
-  ${FASTA_ERROR_CODE}. See ${FASTA_BAD}. ${fasta_file_check} ${RAW_FASTA} ${FASTA_BAD}"
-  db_error_comm  "${MG_URL} is not a valid FASTA file. Sequence validation failed. Error: ${FASTA_ERROR_CODE}. See ${FASTA_BAD}"
-  
-  cleanup && exit 1
-fi
 
-###########################################################################################################
-# 5 - Check for utilities and directories
-###########################################################################################################
-
-ERROR_MESSAGE=$(\
-check_required_writable_directories "${temp_dir:?}" "${RUNNING_JOBS_DIR:?}" "${FAILED_JOBS_DIR:?}" "${job_out_dir:?}";
-check_required_readable_directories "${mg_traits_dir:?}"; 
-check_required_programs "${vsearch}" "${uproc}" "${r_interpreter:?}" "${sina:?}" "${frag_gene_scan:?}" "${sortmerna:?}";\
-)
 
 if [[ -n "${ERROR_MESSAGE}" ]]; then
   email_comm "Not found ${ERROR_MESSAGE}"
