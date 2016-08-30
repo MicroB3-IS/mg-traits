@@ -1,10 +1,41 @@
 #!/bin/bash
 #$ -l mg_traits=1
 
-set -x
+set +x
 set -o pipefail
 
 START_TIME=$(date +%s.%N)
+
+declare MG_TRAITS_DIR="$(dirname "$(readlink -f "$0")")"
+
+CONFIG="${MG_TRAITS_DIR}/conf/mg-traits.conf"
+
+if [[ -r "${CONFIG}" ]]; then
+  source "${CONFIG}"
+else
+  mail -s "mg_traits:${JOB_ID} failed" epereira@mpi-bremen.de <<EOF
+"No "${CONFIG} file"
+EOF
+  exit 1
+fi
+
+##########################################################################################################
+# Load functions: Only after all the variables have been defined
+##########################################################################################################
+
+FUNCTIONS="${MG_TRAITS_DIR}/conf/mg-traits.functions.sh"
+
+if [[ -r "${FUNCTIONS}" ]]; then
+  source "${FUNCTIONS}"
+else
+  mail -s "mg_traits:${JOB_ID} failed" "${mt_admin_mail}" <<EOF
+"No ${FUNCTIONS} file"
+EOF
+  exit 1
+fi
+
+check_required_readable_directories "${MG_TRAITS_DIR}/conf" "${MG_TRAITS_DIR}/bin";
+
 
 ###########################################################################################################
 # 0 - Parse parameters
@@ -32,35 +63,45 @@ declare -r INPUT=$(echo "$1" | sed -e 's/&/|/g' -e 's/\+/ /g' -e 's/%25/%/g' -e 
 
 # set delimiter: change the "&" to "|" and then set IFS="|" so that it can be used in the for loop. 
 IFS="|"
-
+declare -A params;
 # parse input
-for pair in "${INPUT}"; do
-  key=${pair%%=*}
-  value=${pair#*=}
+for pair in ${INPUT}; do
+   key=${pair%%=*};
+   key=${key,,};
+   val=${pair#*=}
+   #echo "key=$key and value=$val"
+   params[$key]=$val
+   #echo "${params[$key]}"
+done
+unset IFS
 
-  if [[ "${key}" = "sample_label" ]]; then 
-    SAMPLE_LABEL="${value}";
-  else
-    error_exit "Mandatory Sample label not defined" 6
-  fi
 
-  if [[ "${key}" = "mg_url" ]]; then
-    MG_URL="${value}";
+if [[ -n ${params["sample_label"]} ]]; then
+    echo ${params["sample_label"]}
+    declare -r SAMPLE_LABEL=${params["sample_label"]};
   else
-    error_exit "Mandatory metagenome URL not defined" 6
-  fi
+    error_exit "Mandatory Sample label not defined" 6 ; exit
+fi
 
-  if [[ "${key}" = "customer" ]]; then
-    CUSTOMER="${value}";
-  else
-    error_exit "Mandatory user name not defined" 6
-  fi
+if [[ -n ${params["mg_url"]} ]]; then
+  declare -r MG_URL=${params["mg_url"]};
+else
+    error_exit "Mandatory metagenome URL not defined" 6; exit
+fi
 
-  if [[ "${key}" = "sample_environment" ]]; then
-    SAMPLE_ENVIRONMENT="${value}";
-  else
-    error_exit "Mandatory environment name not defined" 6
-  fi
+if [[ -n ${params["customer"]} ]]; then
+  declare -r CUSTOMER=${params["customer"]};
+else
+    error_exit "Mandatory user name not defined" 6; exit
+fi
+
+
+if [[ -n ${params["sample_environment"]} ]]; then
+  declare -r SAMPLE_ENVIRONMENT=${params["sample_environment"]};
+else
+    error_exit "Mandatory environment name not defined" 6; exit
+fi
+
 
   if [[ "${key}" = "time_submitted" ]]; then
     SUBMIT_TIME="${value}";
@@ -74,46 +115,18 @@ for pair in "${INPUT}"; do
     KEEP_DATA="${value}";
   fi
 
-  if [[ "${key}" = "id" ]]; then
-    MG_ID="${value}";
-  else
-    error_exit "Mandatory Sample label not defined" 6
-  fi
+if [[ -n ${params["id"]} ]]; then
+  declare -r MG_ID=${params["id"]};
+else
+    error_exit "Mandatory metagenome id not defined" 6; exit
+fi
 
-done
-
-unset IFS
 
 ##########################################################################################################
 # Load general configuration
 ##########################################################################################################
 # todo: add path as a variable
 
-CONFIG="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/conf/mg-traits.conf"
-
-if [[ -r "${CONFIG}" ]]; then
-  source "${CONFIG}"
-else
-  mail -s "mg_traits:${JOB_ID} failed" epereira@mpi-bremen.de <<EOF
-"No "${CONFIG} file"
-EOF
-  exit 1
-fi
-
-##########################################################################################################
-# Load functions: Only after all the variables have been defined
-##########################################################################################################
-
-FUNCTIONS="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/conf/mg-traits.functions.sh"
-
-if [[ -r "${FUNCTIONS}" ]]; then
-  source "${FUNCTIONS}"
-else
-  mail -s "mg_traits:${JOB_ID} failed" "${mt_admin_mail}" <<EOF
-"No ${FUNCTIONS} file"
-EOF
-  exit 1
-fi
 
 ##########################################################################################################
 # mg traits job specific variables
@@ -181,60 +194,36 @@ ERROR_MESSAGE=$(\
     "${RUNNING_JOBS_DIR:?}" \
     "${FAILED_JOBS_DIR:?}" \
     "${job_out_dir:?}";
-  check_required_readable_directories "${mg_traits_dir:?}";
   check_required_programs "${vsearch}" "${uproc}" "${r_interpreter:?}" "${sina:?}" "${frag_gene_scan:?}" "${sortmerna:?}";\
 )
 
+# # check if it already exist on our DB
+ if [[ "${SAMPLE_LABEL}" != "test_label" ]]; then
+   URLDB=$(psql -t -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}" -c \
+   "SELECT count(*) FROM mg_traits.mg_traits_jobs where mg_url = '${MG_URL}' AND sample_label NOT ILIKE 'test_label AND return_code = 0'")
+#
+   if [[ "${URLDB}" -gt 1 ]]; then
+      email_comm "The URL ${MG_URL} has been already succesfully crunched. If the file is different please change the file name"
+      db_error_comm "The URL ${MG_URL} has been already succesfully crunched. If the file is different please change the file name."
+      cleanup && exit 1
+   fi
+ fi
+
 
 ###########################################################################################################
-# 3 - Download file from MG URL
+# 3 -  Download file
 ###########################################################################################################
-# 
-# # validate MG URL 
-# echo "${MG_URL}"
-# REGEX='(https?|ftp|file)://[-A-Za-z0-9\+&@#/%?=~_|!:,.;]*[-A-Za-z0-9\+&@#/%=~_|]'
-#   
-# if [[ ! ${MG_URL} =~ ${REGEX} ]]; then
-#   email_comm "Invalid URL ${MG_URL} output db: ${DB_COM} ${SAMPLE_LABEL}"
-#   db_error_comm "Not valid URL: ${MG_URL}";
-#   cleanup && exit 1
-# fi 
-# 
-# # check if it already exist on our DB            
-# if [[ "${SAMPLE_LABEL}" != "test_label" ]]; then
-#   URLDB=$(psql -t -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}" -c \
-#   "SELECT count(*) FROM mg_traits.mg_traits_jobs where mg_url = '${MG_URL}' AND sample_label NOT ILIKE 'test_label AND return_code = 0'")
-#     
-#   if [[ "${URLDB}" -gt 1 ]]; then 
-#      email_comm "The URL ${MG_URL} has been already succesfully crunched. If the file is different please change the file name"
-#      db_error_comm "The URL ${MG_URL} has been already succesfully crunched. If the file is different please change the file name."
-#      cleanup && exit 1
-#   fi 
-# fi
-# 
-# # # download MG_URL
-# curl -s "${MG_URL}" > "${RAW_DOWNLOAD}"
-# 
-# if [[ "$?" -ne "0" ]]; then 
-#   email_comm "Could not retrieve ${MG_URL}"
-#   db_error_comm  "Could not retrieve ${MG_URL}"
-#   cleanup && exit 1
-# fi
-# 
-# # compress data
-# gunzip -qc "${RAW_DOWNLOAD}" > "${RAW_FASTA}"
-# if [[ "$?" -ne "0" ]]; then 
-#   echo "File was uncompressed"
-#   rm "${RAW_FASTA}"; mv "${RAW_DOWNLOAD}" "${RAW_FASTA}" # NEEDS REVIEW: TRAP AND DB COMMUNICATION?
-# fi
-#
-    
+
+"${MG_TRAITS_DIR}"/bin/file_downloader.sh --url "${MG_URL}" --fastafile "${THIS_JOB_TMP_DIR}"/"${RAW_FASTA}"
+if [[ $? -ne 0 ]]; then
+  error_exit "Could not download fasta file" 8; exit 
+fi
 ###########################################################################################################
 # 4 -  Validate file
 ###########################################################################################################
 
 ## TODO: wait for antonios script
-
+${MG_TRAITS_DIR/bin/}fasta_validator.sh --config ${CONFIG} --fastafile "${THIS_JOB_TMP_DIR}"/"${RAW_FASTA}"
 
 
 if [[ -n "${ERROR_MESSAGE}" ]]; then
