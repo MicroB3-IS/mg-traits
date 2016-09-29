@@ -22,7 +22,7 @@ if [[ -r "${CONFIG}" ]]; then
   source "${CONFIG}"
 else
   mail -s "mg_traits:${JOB_ID} failed" epereira@mpi-bremen.de << EOF
-"No "${CONFIG} file"
+"No ${CONFIG} file"
 EOF
   exit 2
 fi
