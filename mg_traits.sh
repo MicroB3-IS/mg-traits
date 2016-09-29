@@ -180,15 +180,6 @@ if [[ "${RETURN_CODE}" -ne "0" ]]; then
   RETURN_CODE = ${RETURN_CODE}" 1; exit
 fi
 
-mkdir "${THIS_JOB_TMP_DIR_DATA}" && mkdir "${SINA_LOG_DIR}"
-
-RETURN_CODE="$?"
-if [[ "${RETURN_CODE}" -ne "0" ]]; then
-  db_error_comm "Could not create data temp dir ${THIS_JOB_TMP_DIR_DATA}. \
-  RETURN_CODE = ${RETURN_CODE}"
-  error_exit "Could not create data temp dir ${THIS_JOB_TMP_DIR_DATA}. \
-  RETURN_CODE = ${RETURN_CODE}" 1; exit
-fi
 
 ################################################################################
 # 6 - Check for utilities, files and directories
@@ -856,11 +847,11 @@ fi
 
 TOTAL_TIME=$(echo "SELECT (time_finished - time_started) FROM \
 mg_traits.mg_traits_jobs WHERE sample_label = '${SAMPLE_LABEL}' \
-AND id = '${MG_ID}';" psql -t \
+AND id = '${MG_ID}';" | psql -t \
 -U "${target_db_user}" -h "${target_db_host}" \
 -p "${target_db_port}" -d "${target_db_name}" | tr -d ' ')
 
-echo "llegue" ${TOTAL_TIME}
+
 
 RETURN_CODE="$?"
 if [[ "${RETURN_CODE}" -eq "0" ]]; then
