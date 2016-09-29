@@ -1,16 +1,15 @@
-NSLOTS="4"
+NSLOTS=4
 
 ## proxy
 http_proxy="http://webproxy.mpi-bremen.de:3128"
 https_proxy="https://webproxy.mpi-bremen.de:3128"
 
-fasta_validator_version="1.0.1"
-FASTA_VALIDATOR="/bioinf/software/FastaValidator/\
-FastaValidator-${fasta_validator_version}/FastaValidatorUi-1.0.jar"
+FASTA_VALIDATOR="/bioinf/software/FastaValidator/FastaValidator-1.0.1/\
+FastaValidatorUi-1.0.jar"
 
 ## folders
-RESOURCES="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/resources/"
-BIN="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/bin"
+RESOURCES="/bioinf/projects/megx/mg-traits/mg-traits_github_floder"
+RESOURCES_BIN="${RESOURCES}/bin"
 temp_dir="/bioinf/projects/megx/scratch/mg-traits"
 job_out_dir="/vol/tmp/megx/"
 
@@ -38,14 +37,13 @@ sortmerna_version="2.0"
 sortmerna="/bioinf/software/sortmerna/sortmerna-${sortmerna_version}/bin/\
 sortmerna"
 DB="/bioinf/software/sortmerna/sortmerna-${sortmerna_version}/"
-SMRNA_MEM="4000"
 
-## sina 
+## sina                                
 sina_version="1.2.13"
 #sina="/bioinf/software/sina/sina-1.3.0rc/sina"
-sina="${RESOURCES}/sina/sina-${sina_version}/sina"
-sina_arb_pt_server="${RESOURCES}/sina/sina-${sina_version}\
-/lib/arb_pt_server"
+sina="/bioinf/projects/megx/mg-traits/resources/sina/sina-${sina_version}/sina"
+sina_arb_pt_server="/bioinf/projects/megx/mg-traits/bin/sina-${sina_version}/\
+lib/arb_pt_server"
 
 sina_seed_version="ssu_seed_50_26_05_13_cut_t"
 sina_seed="/local/biodb/mg-traits/sina/${sina_seed_version}.arb"
@@ -54,36 +52,50 @@ sina_seed="/local/biodb/mg-traits/sina/${sina_seed_version}.arb"
 # NEEDS PERMISSIONS TO RUN IN /bioinf/projects/megx !!!!
 # sina_ref="${RESOURCES}/sina/SSURef_Nr99_123.1_SILVA_03_03_16_opt.arb" 
 sina_ref_version="SSURef_Nr99_123.1_SILVA_03_03_16"
-sina_ref="${RESOURCES}/sina/${sina_ref_version}_opt.arb"
+sina_ref="/bioinf/home/epereira/workspace/mg-traits/resources/sina/\
+${sina_ref_version}_opt.arb"
 
-ARBHOME="${RESOURCES}/sina/sina-${sina_version}/"
-LD_LIBRARY_PATH="${RESOURCES}/sina/sina-${sina_version}/lib:/bioinf/\
+ARBHOME="/bioinf/projects/megx/mg-traits/bin/sina-${sina_version}/"
+LD_LIBRARY_PATH="/bioinf/projects/megx/mg-traits/bin/sina-1.2.13/lib:/bioinf/\
 software/gcc/gcc-4.9/lib64:/usr/lib/libgomp.so.1:$LD_LIBRARY_PATH"
-# export LD_LIBRARY_PATH
+export LD_LIBRARY_PATH
 
 ## R
 r_interpreter_version="3.2.3"
 r_interpreter="/bioinf/software/R/R-${r_interpreter_version}/bin/R"
 
-seq_stats="${BIN}/seq_stats.R"
+## scripts
+fasta_file_check="${RESOURCES_BIN}/fasta_file_check.pl"
+fgs_runner="${RESOURCES_BIN}/fgs_runner2.sh"
+sina_runner="${RESOURCES_BIN}/sina_runner2.sh"
+finish_runner="${RESOURCES_BIN}/finish_runner.sh"
+# finish_runner2="/bioinf/projects/megx/mg-traits/resources/bin/test/\
+# finish_runner.sh"
+
+seq_stats="${RESOURCES_BIN}/seq_stats.R"
 vsearch_version="2.0.2"
 vsearch="/bioinf/software/vsearch/vsearch-${vsearch_version}/bin/vsearch"
-vsearch_runner="${BIN}/vsearch_runner.sh"
-sortmerna_runner2="${BIN}/sortmerna_runner2.sh"
+vsearch_runner="${RESOURCES_BIN}/vsearch_runner.sh"
+sortmerna_runner2="${RESOURCES_BIN}/sortmerna_runner2.sh"
 
 ## URLs: pfam, silva, tf_file
-PFAM_ACCESSIONS="${RESOURCES}/txts/pfam28_acc.txt"
-TFFILE="${RESOURCES}/txts/TF.txt"
-SLV_FILE="${RESOURCES}/txts/silva_tax_order_115.txt"
+PFAM_ACCESSIONS="/bioinf/projects/megx/mg-traits/\
+mg-traits_github_floderresources/txts/pfam28_acc.txt"
 
-NSEQ="10000"
-nSEQ="1000"
+TFFILE="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/resources/txts/\
+TF.txt"
+
+SLV_TAX="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/resources/\
+txts/silva_tax_order_115.txt"
+
+NSEQ=1000000 # set to 2000 000 
+nSEQ=1000  # set to 2000
+# NSEQ=50000 # set to 2000 000 
+# nSEQ=500  # set to 2000
 
 # psql connection
 target_db_user="epereira"
 target_db_host="antares"
 target_db_port="5434"
-target_db_name="megdb_r8"
-
-
+# target_db_name="megdb_r8"
 

@@ -14,11 +14,9 @@ function error_exit() {
   local msg=${1}
   local exit_code=${2}
   echo ${msg} 1>&2
-
   if [[ -n "${mt_admin_mail}" ]]; then
     email_comm ${1}
   fi
-
   cleanup
   exit ${exit_code}
 }
