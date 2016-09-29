@@ -10,10 +10,9 @@ set -o pipefail
 #####################################
 START_TIME=$( date +%s.%N )
 
-source ./00-preprocess_env
-
 SAMPLE_LABEL="${1}"
 PREPROCESS_DIR="/bioinf/projects/megx/mg-traits/TARA_crunch/preprocess_data"
+WORKING_TMP_DIR="${PREPROCESS_DIR}/${SAMPLE_LABEL}"
 
 ##### load modules #####
 source /bioinf/software/etc/profile.modules
@@ -28,10 +27,10 @@ bbduk="/bioinf/software/bbmap/bbmap-35.14/bbduk.sh"
 # vsearch
 vsearch_runner="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/bin/vsearch_runner.sh"
 # db communication
-# target_db_user=epereira
-# target_db_host=antares
-# target_db_port=5434
-# target_db_name=megdb_r8
+target_db_user=epereira
+target_db_host=antares
+target_db_port=5434
+target_db_name=megdb_r8
 
 # email
 mt_admin_mail=epereira@mpi-bremen.de
@@ -56,7 +55,7 @@ function db_error_comm() {
 }
 
 function cleanup() {
-mv -f "${THIS_JOB_TMP_DIR}" /bioinf/projects/megx/mg-traits/TARA_crunch/failed_preprocess_data/
+mv -f "${WORKING_TMP_DIR}" /bioinf/projects/megx/mg-traits/TARA_crunch/failed_preprocess_data/
 }
 trap cleanup SIGINT SIGKILL SIGTERM
 
@@ -95,7 +94,7 @@ echo "${RFILES}" | \
         ln -s "/bioinf/home/epereira/workspace/mg-traits/tara_prepross/data/toyFASTQ/${N}" .
     done
 
-echo "UPDATE mg_traits.mg_traits_jobs SET mg_url = '${RFILES}' WHERE sample_label = '${SAMPLE_LABEL}' AND  job_id = '${JOB_ID}';" | \
+echo "UPDATE epereira.preprocess_jobs SET mg_url = '${RFILES}' WHERE sample_label = '${SAMPLE_LABEL}' AND  job_id = '${JOB_ID}';" | \
 psql -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}"
 
 ######################################################    
@@ -105,8 +104,8 @@ R1_raw_all=R1_raw_all.fastq.gz
 R2_raw_all=R2_raw_all.fastq.gz
 
 cat > remote_run.bash << EOF
-cat "${THIS_JOB_TMP_DIR}"/*_1.fastq.gz > "${THIS_JOB_TMP_DIR}"/"${R1_raw_all}"
-cat "${THIS_JOB_TMP_DIR}"/*_2.fastq.gz > "${THIS_JOB_TMP_DIR}"/"${R2_raw_all}"
+cat "${WORKING_TMP_DIR}"/*_1.fastq.gz > "${WORKING_TMP_DIR}"/"${R1_raw_all}"
+cat "${WORKING_TMP_DIR}"/*_2.fastq.gz > "${WORKING_TMP_DIR}"/"${R2_raw_all}"
 EOF
 
 ssh arcturus 'bash -s' < remote_run.bash
@@ -226,11 +225,11 @@ rm "tmp.SR.fasta" "${SE_rmadapt}" "${PE1_qc_nonmerged}" "${PE2_qc_nonmerged}" *a
 # Remove duplicates
 #####################################################################
 
-RAW_FASTA=01-raw-fasta # Same name as PROCESS_FASTA in config.bash. It is defined here so it can be run independelty.
-SE_log=01-raw_SR_vsearch.log
+SE_nodup=pre-process.SR.fasta # Same name as PROCESS_FASTA in config.bash. It is defined here so it can be run independelty.
+SE_log=pre-process.SR_vsearch.log
 
 #-l h="mg9.mpi-bremen.de|mg10.mpi-bremen.de|mg11.mpi-bremen.de|mg12.mpi-bremen.de|mg13.mpi-bremen.de|mg14.mpi-bremen.de|mg15.mpi-bremen.de|mg16.mpi-bremen.de,exclusive" 
-qsub -sync y -pe threaded "${NSLOTS}" "${vsearch_runner}" "${SR_qc}" "${RAW_FASTA}" "${SE_log}"
+qsub -sync y -pe threaded "${NSLOTS}" "${vsearch_runner}"  "${SR_qc}" "${SE_nodup}" "${SE_log}" "${NSLOTS}"
 
  if [[ "$?" -ne "0" ]]; then  
     email_comm "vsearch failed"

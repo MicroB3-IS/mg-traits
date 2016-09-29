@@ -13,7 +13,6 @@ START_TIME=$( date +%s.%N )
 source ./00-preprocess_env
 
 SAMPLE_LABEL="${1}"
-PREPROCESS_DIR="/bioinf/projects/megx/mg-traits/TARA_crunch/preprocess_data"
 
 ##### load modules #####
 source /bioinf/software/etc/profile.modules
@@ -27,11 +26,6 @@ pear="/bioinf/software/pear/pear-0.9.8/bin/pear"
 bbduk="/bioinf/software/bbmap/bbmap-35.14/bbduk.sh"
 # vsearch
 vsearch_runner="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/bin/vsearch_runner.sh"
-# db communication
-# target_db_user=epereira
-# target_db_host=antares
-# target_db_port=5434
-# target_db_name=megdb_r8
 
 # email
 mt_admin_mail=epereira@mpi-bremen.de
@@ -43,39 +37,15 @@ declare AFILE="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/assem-fil
 # Functions
 ######################################
 
-function email_comm() {
-mail -s "mg_traits:${JOB_ID} failed" "${mt_admin_mail}" <<EOF
-"${1}"
+FUNCTIONS="/bioinf/projects/megx/mg-traits/mg-traits_github_floder/config_files/config.bash"
+
+if [[ -r "${FUNCTIONS}" ]]; then
+  source "${FUNCTIONS}"
+else
+  mail -s "mg_traits:${JOB_ID} failed" "${mt_admin_mail}" <<EOF
+"No ${FUNCTIONS} file"
 EOF
-}
-
-
-function db_error_comm() {
-  echo "UPDATE epereira.preprocess_jobs SET time_finished = now(), return_code = 1, error_message = '${1}' \
-  WHERE sample_label = '${SAMPLE_LABEL}' AND job_id = '${JOB_ID}';" | psql -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}"
-}
-
-function cleanup() {
-mv -f "${THIS_JOB_TMP_DIR}" /bioinf/projects/megx/mg-traits/TARA_crunch/failed_preprocess_data/
-}
-trap cleanup SIGINT SIGKILL SIGTERM
-
-#####################################################
-# insert job in table preprocess_jobs
-#####################################################
-#JOB_ID=1
-DB_RESULT=$( echo  "INSERT INTO epereira.preprocess_jobs (customer, mg_url, sample_label, sample_env_ontology, time_started, job_id, cluster_node ) \
-VALUES ('anonymous', 'file://no_file', '${SAMPLE_LABEL}', 'marine', now(),'${JOB_ID}', '${HOSTNAME}' );" \
-| psql -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}" );
-
-if [[ "$?" -ne "0" ]]; then
-  email_comm "Cannot connect to database. Output:${DB_RESULT}"
-  cleanup && exit 2
-fi
-
-if [[ "${DB_RESULT}" != "INSERT 0 1" ]]; then
-  email_comm "sample name ${SAMPLE_LABEL} is not in database Result:${DB_RESULT}"  
-  cleanup && exit 2
+  exit 1
 fi
 
 #####################################################
@@ -95,7 +65,9 @@ echo "${RFILES}" | \
         ln -s "/bioinf/home/epereira/workspace/mg-traits/tara_prepross/data/toyFASTQ/${N}" .
     done
 
-echo "UPDATE mg_traits.mg_traits_jobs SET mg_url = '${RFILES}' WHERE sample_label = '${SAMPLE_LABEL}' AND  job_id = '${JOB_ID}';" | \
+
+RFILES=$( echo "${RFILES}" | sed 's/TARA[^\ ]\+ //g');
+echo "UPDATE mg_traits.mg_traits_jobs SET mg_url = '${RFILES}' WHERE sample_label = '${SAMPLE_LABEL}' AND id = '${MG_ID}';" | \
 psql -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}"
 
 ######################################################    
@@ -104,14 +76,18 @@ psql -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${
 R1_raw_all=R1_raw_all.fastq.gz
 R2_raw_all=R2_raw_all.fastq.gz
 
-cat > remote_run.bash << EOF
+# cat > remote_run.bash << EOF
+# cat "${THIS_JOB_TMP_DIR}"/*_1.fastq.gz > "${THIS_JOB_TMP_DIR}"/"${R1_raw_all}"
+# cat "${THIS_JOB_TMP_DIR}"/*_2.fastq.gz > "${THIS_JOB_TMP_DIR}"/"${R2_raw_all}"
+# EOF
+
+
 cat "${THIS_JOB_TMP_DIR}"/*_1.fastq.gz > "${THIS_JOB_TMP_DIR}"/"${R1_raw_all}"
 cat "${THIS_JOB_TMP_DIR}"/*_2.fastq.gz > "${THIS_JOB_TMP_DIR}"/"${R2_raw_all}"
-EOF
 
-ssh arcturus 'bash -s' < remote_run.bash
+# ssh arcturus 'bash -s' < remote_run.bash
 
-rm remote_run.bash
+# rm remote_run.bash
 rm *_1.fastq.gz #Remove original file links
 rm *_2.fastq.gz 
 
@@ -245,10 +221,6 @@ RUN_TIME=$(echo "${END_TIME}" - "${START_TIME}" | bc -l)
 #########################################################################
 # time registration
 #########################################################################
-
- echo "UPDATE epereira.preprocess_jobs SET total_run_time = total_run_time + '${RUN_TIME}', time_protocol = time_protocol, time_finished = '${END_TIME}', return_code = '0';" \
- | psql -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}"
-
 
 
 #  echo "UPDATE epereira.preprocess_jobs SET total_run_time = total_run_time + "${RUN_TIME}", time_protocol = time_protocol \

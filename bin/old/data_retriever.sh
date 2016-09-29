@@ -1,0 +1,200 @@
+#!/bin/bash
+# splitrer exit codes
+# 0    valid input
+# 1    no valid url
+# 2    no recognized downlaod file format
+# 37   download failed
+
+show_usage(){
+  cat <<EOF
+  Usage: ${0##*/} [-h] [-c|--config FILE] [-i|--input FILE] [-o|--prefix STRIG]\
+[-o|--outdir DIR] [-n|--nseq NUMBER]
+
+  -h|--help          display this help and exit
+  -c|--config        configuration file
+  -i|--input         input fasta file
+  -o|--outdir        output directory
+  -p|--prefix        prefix splitted file
+EOF
+}
+
+read_config(){
+  CONFIG_FILE="${1}"
+
+  if [[ ! -r "${CONFIG_FILE}" ]]; then
+    echo "${CONFIG_FILE} doesn't exist or is not readable"
+    exit 1
+  fi
+
+  CONFIG_SYNTAX="^\s*#|^\s*$|^[0-9a-zA-Z_]+=\"[^\"]*$|^[0-9a-zA-Z_]+\=\"[^\"]\
+*\"$|[^\"]*\"$"
+
+  if egrep -q -v "${CONFIG_SYNTAX}" "${CONFIG_FILE}"; then
+    echo "Error parsing config file ${CONFIG_FILE}." >&2
+    echo "The following lines in the configfile do not fit the syntax:" >&2
+    egrep -vn "${CONFIG_SYNTAX}" "$CONFIG_FILE"
+    exit 5
+  fi
+
+  source "${CONFIG_FILE}"
+}
+
+
+function data_retreiever() {
+
+  local PCA_CODON_FILE="${1}"
+
+  if [[ ! -r "${INPUT}" ]]; then
+    echo "${INPUT} doesn't exist or is not readable"
+  fi
+
+  "${r_interpreter}" --vanilla --slave <<RSCRIPT
+  library(vegan)
+  t<-read.table(file="${PCA_CODON_FILE}", sep = "\t", header = T, \
+  stringsAsFactors = F)
+  t\$sample_label <- NULL
+  row.names(t)<- t\$id
+  t\$id <- NULL
+  pca<-rda(t)
+  pca.scores<-as.data.frame(scores(pca)\$sites)
+  pca.scores<-cbind(rownames(pca.scores), "codon-usage", pca.scores, "${MG_ID}")
+  write.table(pca.scores, file = "${PCA_CODON_DB}", col.names = F, \
+  row.names = F, sep = "\t", quote = F)
+
+RSCRIPT
+
+
+  EXIT_CODE="$?"
+}
+
+main(){
+
+  if [[ -n "${CONFIG_FILE}" ]]; then
+    read_config "${CONFIG_FILE}"
+  fi
+
+  data_retriever ${PCA_CODON_FILE} ${PCA_AA_FILE} ${PCA_DINUC_FILE} \
+  ${PCA_FUNCTIONAL_FILE} ${PCA_TAXONOMY_FILE}
+
+  if [[ "${EXIT_CODE}" -eq "0" ]]; then
+    echo "Data retriever successful"
+  else
+    echo "Data retriever failed"
+  fi
+  exit "${EXIT_CODE}"
+}
+
+
+if  [[ "$#" -eq 0 ]]; then
+    show_usage
+fi
+
+#######################################
+# parse positional parameters
+#######################################
+
+while :; do
+  case "${1}" in
+
+    -h|-\?|--help) # Call a "show_help" function to display a synopsis, then
+                   # exit.
+    show_usage
+    exit
+    ;;
+
+    -i|--input) # Takes an option argument, ensuring it has been
+                # specified.
+    if [[ -n "${2}" ]]; then
+      INPUT="${2}"
+      shift
+    else
+      printf 'ERROR: "--input" requires a non-empty option argument.\n' >&2
+      exit 1
+    fi
+    ;;
+
+    --input=?*)
+    INPUT=${1#*=} # Delete everything up to "=" and assign the remainder.
+    ;;
+
+    --input=)     # Handle the case of an empty --file=
+    printf 'ERROR: "--input" requires a non-empty option argument.\n' >&2
+    exit 1
+    ;;
+
+    -o|--outdir) # Takes an option argument, ensuring it has been
+                 # specified.
+    if [[ -n "${2}" ]]; then
+      OUTDIR="${2}"
+      shift
+    else
+      printf 'ERROR: "--outdir" requires a non-empty option argument.\n' >&2
+      exit 1
+    fi
+    ;;
+
+    --outdir=?*)
+    OUTDIR=${1#*=} # Delete everything up to "=" and assign the remainder.
+    ;;
+
+    --outdir=)     # Handle the case of an empty --file=
+    printf 'ERROR: "--outdir" requires a non-empty option argument.\n' >&2
+    exit 1
+    ;;
+
+    -p|--prefix)  # Takes an option argument, ensuring it has been specified.
+    if [[ -n "${2}" ]]; then
+      PREFIX="${2}"
+      shift
+    else
+      printf 'ERROR: "--prefix" requires a non-empty option argument.\n' >&2
+      exit 1
+    fi
+    ;;
+
+    --prefix=?*)
+    PREFIX=${1#*=} # Delete everything up to "=" and assign the remainder.
+    ;;
+
+    --prefix=)         # Handle the case of an empty --file=
+    printf 'ERROR: "--prefix" requires a non-empty option argument.\n' >&2
+    exit 1
+    ;;
+
+   -c|--config) # Takes an option argument, ensuring it has been specified.
+    if [ -n "${2}" ]; then
+      CONFIG_FILE="${2}"
+      shift
+    else
+      printf 'ERROR: "--config" requires a non-empty option argument.\n' >&2
+      exit 1
+    fi
+    ;;
+
+    --config=?*)
+    CONFIG_FILE=${1#*=} # Delete everything up to "=" and assign the
+                        # remainder.
+    ;;
+
+    --config=) # Handle the case of an empty --file=
+    printf 'WARN: Using default environment.\n' >&2
+    ;;
+
+    --)              # End of all options.
+    shift
+    break
+    ;;
+
+    -?*)
+    printf 'WARN: Unknown option (ignored): %s\n' "$1" >&2
+    ;;
+
+    *) # Default case: If no more options then break out of the loop.
+    break
+    esac
+
+    shift
+done
+
+main "$@"
+
