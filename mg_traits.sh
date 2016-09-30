@@ -147,24 +147,24 @@ fi
 ################################################################################
 # 4 - Check database connection by setting starting time
 ################################################################################
-# if [[ -n "${target_db_name}" ]]; then
-#   DB_RESULT=$( \
-#     echo "UPDATE mg_traits.mg_traits_jobs SET time_started = now(), \
-#           job_id = '${JOB_ID}', cluster_node = '${HOSTNAME}' \
-#           WHERE sample_label = '${SAMPLE_LABEL}' \
-#             AND id = ${ID};" \
-#          | psql -U "${target_db_user}" -h "${target_db_host}" \
-#                 -p "${target_db_port}" -d "${target_db_name}" \
-#   )
-#   if [[ "$?" -ne "0" ]]; then
-#     error_exit "Cannot connect to database. Output:${DB_RESULT}" 1; exit
-#   fi
-# 
-#   if [[ "${DB_RESULT}" != "UPDATE 1" ]]; then
-#     error_exit "sample name ${SAMPLE_LABEL} is not in database \
-# Result:${DB_RESULT}" 1; exit
-#   fi
-# fi
+if [[ -n "${target_db_name}" ]]; then
+  DB_RESULT=$( \
+    echo "UPDATE mg_traits.mg_traits_jobs SET time_started = now(), \
+          job_id = '${JOB_ID}', cluster_node = '${HOSTNAME}' \
+          WHERE sample_label = '${SAMPLE_LABEL}' \
+            AND id = ${ID};" \
+         | psql -U "${target_db_user}" -h "${target_db_host}" \
+                -p "${target_db_port}" -d "${target_db_name}" \
+  )
+  if [[ "$?" -ne "0" ]]; then
+    error_exit "Cannot connect to database. Output:${DB_RESULT}" 1; exit
+  fi
+
+  if [[ "${DB_RESULT}" != "UPDATE 1" ]]; then
+    error_exit "sample name ${SAMPLE_LABEL} is not in database \
+Result:${DB_RESULT}" 1; exit
+  fi
+fi
 
 ################################################################################
 # 5 - Create job directory
@@ -214,27 +214,27 @@ fi
 # 7 - check if it already exist on our DB
 ################################################################################
 
-# if [[ -n "${target_db_name}" ]]; then
-# 
-#   if [[ "${SAMPLE_LABEL}" != "test_label" ]]; then
-#     URLDB=$(
-#            psql -t -U "${target_db_user}" -h "${target_db_host}" \
-#                    -p "${target_db_port}" -d "${target_db_name}" -c \
-#            "SELECT count(*) FROM mg_traits.mg_traits_jobs where \
-#            mg_url = '${MG_URL}' AND sample_label NOT ILIKE 'test_label \
-#            AND return_code = 0'"
-#           )
-# 
-#   if [[ "${URLDB}" -gt 1 ]]; then
-#     db_error_comm "The URL ${MG_URL} has been already succesfully crunched. If
-# the file is different please change the file name."
-#     error_exit "The URL ${MG_URL} has been already succesfully crunched. If
-# the
-# file is different please change the file name" 1;
-#     fi
-#   fi
-#
-# fi
+if [[ -n "${target_db_name}" ]]; then
+
+  if [[ "${SAMPLE_LABEL}" != "test_label" ]]; then
+    URLDB=$(
+           psql -t -U "${target_db_user}" -h "${target_db_host}" \
+                   -p "${target_db_port}" -d "${target_db_name}" -c \
+           "SELECT count(*) FROM mg_traits.mg_traits_jobs where \
+           mg_url = '${MG_URL}' AND sample_label NOT ILIKE 'test_label \
+           AND return_code = 0'"
+          )
+
+  if [[ "${URLDB}" -gt 1 ]]; then
+    db_error_comm "The URL ${MG_URL} has been already succesfully crunched. If
+the file is different please change the file name."
+    error_exit "The URL ${MG_URL} has been already succesfully crunched. If
+the
+file is different please change the file name" 1;
+    fi
+  fi
+
+fi
 
 ################################################################################
 # 8 -  Download file
@@ -821,21 +821,22 @@ fi
 END_TIME=$( date +%s.%N )
 RUN_TIME=$( echo "${END_TIME}"-"${START_TIME}" | bc -l )
 
-echo "UPDATE mg_traits.mg_traits_jobs SET time_finished = now(), \
+
+RETURN=$( echo "UPDATE mg_traits.mg_traits_jobs SET time_finished = now(), \
 return_code = 0, total_run_time = ${RUN_TIME}, \
 time_protocol = time_protocol || ('${JOB_ID}', 'mg_traits_finish', \
 ${RUN_TIME})::mg_traits.time_log_entry \
  WHERE sample_label = '${SAMPLE_LABEL}' AND id = '${ID}';" | psql \
 -U "${target_db_user}" -h "${target_db_host}" \
--p "${target_db_port}" -d "${target_db_name}"
+-p "${target_db_port}" -d "${target_db_name}" )
 
-RETURN_CODE="$?"
-if [[ "${RETURN_CODE}" -ne "0" ]]; then
+
+if [[ "${RETURN}" != "UPDATE 1" ]]; then
   db_error_comm "Error updating job table. RETURN_CODE = ${RETURN_CODE}"
   error_exit "Error updating jobs table. RETURN_CODE = ${RETURN_CODE}" 1; exit
 fi
 
-rm -rf "job-$THIS_JOB_ID"
+
 mv "${THIS_JOB_TMP_DIR}" "${FINISHED_JOBS_DIR}"
 
 RETURN_CODE="$?"
@@ -845,12 +846,11 @@ if [[ "${RETURN_CODE}" -ne "0" ]]; then
   exit
 fi
 
-TOTAL_TIME=$(echo "SELECT (time_finished - time_started) FROM \
+TOTAL_TIME=$( echo "SELECT (time_finished - time_started) FROM \
 mg_traits.mg_traits_jobs WHERE sample_label = '${SAMPLE_LABEL}' \
-AND id = '${MG_ID}';" | psql -t \
+AND id = '${ID}';" | psql -t \
 -U "${target_db_user}" -h "${target_db_host}" \
 -p "${target_db_port}" -d "${target_db_name}" | tr -d ' ')
-
 
 
 RETURN_CODE="$?"
