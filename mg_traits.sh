@@ -1,8 +1,9 @@
 #!/bin/bash
-#$ -l mg_traits=1
 
-set +x
-set -o pipefail
+# # $ -l mg_traits=1
+
+# set +x
+# set -o pipefail
 
 START_TIME=$(date +%s.%N)
 MG_TRAITS_DIR="$(dirname "$(readlink -f "$0")")"
