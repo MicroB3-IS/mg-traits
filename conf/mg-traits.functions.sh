@@ -118,7 +118,7 @@ function db_table_load1() {
   tail -n1 "${1}" | awk -vI="${ID}" -vO="${SAMPLE_LABEL}" \
   '{print I"\t"O"\t"$0}' | psql -U "${target_db_user}" \
   -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}" \
-  -c "\COPY epereira.${2} FROM STDIN CSV delimiter E'\t'"
+  -c "\COPY mg_traits.${2} FROM STDIN CSV delimiter E'\t'"
 }
 
 ### CHANGE SCHEMA TO mg_traits!!!!
@@ -126,7 +126,7 @@ function db_table_load2() {
   tail -n1 "${1}" | awk -vI="${ID}" -vO="${SAMPLE_LABEL}" \
   '{print O"\t"$0"\t"I}' | psql -U "${target_db_user}" \
   -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}" \
-  -c "\COPY epereira.${2} FROM STDIN CSV delimiter E'\t'"
+  -c "\COPY mg_traits.${2} FROM STDIN CSV delimiter E'\t'"
 }
 
 
@@ -152,7 +152,7 @@ data_retriever2() {
 function db_pca_load() {
  cat "${1}" | psql -U "${target_db_user}" -h "${target_db_host}" \
  -p "${target_db_port}" -d "${target_db_name}" \
- -c "\COPY epereira.mg_traits_pca FROM STDIN CSV delimiter E'\t'"
+ -c "\COPY mg_traits.mg_traits_pca FROM STDIN CSV delimiter E'\t'"
 }
 
 trap cleanup SIGINT SIGKILL SIGTERM
