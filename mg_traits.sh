@@ -29,7 +29,7 @@ EOF
 fi
 
 ################################################################################
-# 1 - Parse parameters
+# 1.1 - Parse parameters
 ################################################################################
 
 if [[ -z "${1}" ]]; then
@@ -77,7 +77,7 @@ EOF
 done
 
 ################################################################################
-# 2 - Set mg traits job specific variables
+# 1.2 - Set mg traits job specific variables
 ################################################################################
 THIS_JOB_TMP_DIR=$(readlink -m "${RUNNING_JOBS_DIR}/job-${JOB_ID}")
 THIS_JOB_TMP_DIR_DATA="${THIS_JOB_TMP_DIR}/data/"
@@ -131,7 +131,7 @@ PCA_TAXONOMY_DB="${THIS_JOB_TMP_DIR}/10-pca-taxonomy-db"
 
 
 ################################################################################
-# 3 - Load functions: Only after all the variables have been defined
+# 1.3 - Load functions: Only after all the variables have been defined
 ################################################################################
 
 FUNCTIONS="${MG_TRAITS_DIR}/conf/mg-traits.functions.sh"
@@ -146,7 +146,7 @@ EOF
 fi
 
 ################################################################################
-# 4 - Check database connection by setting starting time
+# 1.4 - Check database connection by setting starting time
 ################################################################################
 if [[ -n "${target_db_name}" ]]; then
   DB_RESULT=$( \
@@ -168,7 +168,7 @@ Result:${DB_RESULT}" 1; exit
 fi
 
 ################################################################################
-# 5 - Create job directory
+# 1.5 - Create job directory
 ################################################################################
 
 mkdir "${THIS_JOB_TMP_DIR}"
@@ -183,13 +183,13 @@ fi
 
 
 ################################################################################
-# 6 - Check for utilities, files and directories
+# 1.6 - Check for utilities, files and directories
 ################################################################################
 
 ERROR_MESSAGE=$(\
   check_required_readable_directories \
   "${MG_TRAITS_DIR}/conf" \
-  "${MG_TRAITS_DIR}/bin";
+  "${MG_TRAITS_DIR}/modules";
 
   check_required_writable_directories \
   "${temp_dir:?}" \
@@ -212,7 +212,7 @@ if [[ "${ERROR_MESSAGE}" ]]; then
 fi
 
 ################################################################################
-# 7 - check if it already exist on our DB
+# 1.7 - check if it already exist on our DB
 ################################################################################
 
 if [[ -n "${target_db_name}" ]]; then
@@ -238,10 +238,10 @@ file is different please change the file name" 1;
 fi
 
 ################################################################################
-# 8 -  Download file
+# 1.8 -  Download file
 ################################################################################
 
-"${MG_TRAITS_DIR}"/bin/file_downloader.sh --config "${CONFIG}" \
+"${MG_TRAITS_DIR}"/modules/file_downloader.sh --config "${CONFIG}" \
 --dout "${RAW_DOWNLOAD}" \
 --url "${MG_URL}" \
 --fout "${RAW_FASTA}"
@@ -254,10 +254,10 @@ if [[ "${RETURN_CODE}" != "0" ]]; then
 fi
 
 ################################################################################
-# 9 -  Validate file
+# 1.9 -  Validate file
 ################################################################################
 
-${MG_TRAITS_DIR}/bin/fasta_validator.sh --config "${CONFIG}" \
+${MG_TRAITS_DIR}/modules/fasta_validator.sh --config "${CONFIG}" \
 --seqtype dna \
 --fastafile "${RAW_FASTA}";
 
@@ -268,10 +268,10 @@ if [[ "${RETURN_CODE}" != "0" ]]; then
 fi
 
 ################################################################################
-# 7 - Check for duplicates
+# 1.10 - Check for duplicates
 ################################################################################
 
-${MG_TRAITS_DIR}/bin/deduplicator.sh --config "${CONFIG}" \
+${MG_TRAITS_DIR}/modules/deduplicator.sh --config "${CONFIG}" \
 --input "${RAW_FASTA}" \
 --output "${UNIQUE}" \
 --log "${UNIQUE_LOG}"
@@ -288,7 +288,7 @@ awk '{ print $2}'\ )
 
 
 ################################################################################
-# 8 - Calculate sequence statistics
+# 1.11 - Calculate sequence statistics
 ################################################################################
 
 # infoseq
@@ -300,7 +300,7 @@ if [[ "$?" -ne "0" ]]; then
 fi
 
 # seq stats
-${MG_TRAITS_DIR}/bin/seq_basic_stats.sh --config "${CONFIG}" \
+${MG_TRAITS_DIR}/modules/seq_basic_stats.sh --config "${CONFIG}" \
 --input "${INFOSEQ_TMPFILE}" \
 --output "${INFOSEQ_MGSTATS}"
 
@@ -319,10 +319,10 @@ printf "Number of bases: %d\nGC content: %f\nGC variance: %f\n" "${NUM_BASES}"\
 
 
 ################################################################################
-# Split original
+# 1.12 - Split original
 ################################################################################
 
-${MG_TRAITS_DIR}/bin/fasta_splitter.sh --config "${CONFIG}" \
+${MG_TRAITS_DIR}/modules/fasta_splitter.sh --config "${CONFIG}" \
 --input "${RAW_FASTA}" \
 --prefix 05-part \
 --outdir "${THIS_JOB_TMP_DIR}"
@@ -334,14 +334,14 @@ if [[ "${RETURN_CODE}" != "0" ]]; then
 fi
 
 ################################################################################
-# 1 - run fgs
+# 2.1 - run fgs
 ################################################################################
 
 NFILES=$(find "${THIS_JOB_TMP_DIR}" -name "05-part*.fasta" | wc -l)
 
 qsub -j y -o "${THIS_JOB_TMP_DIR}" -t 1-"${NFILES}" \
 -pe threaded "${NSLOTS}" -N "${FGS_JOBARRAYID}" \
-${MG_TRAITS_DIR}/bin/fgs_runner.sh --config "${CONFIG}" \
+${MG_TRAITS_DIR}/modules/fgs_runner.sh --config "${CONFIG}" \
 --inputdir "${THIS_JOB_TMP_DIR}" \
 --prefix 05-part \
 --outdir "${THIS_JOB_TMP_DIR}"
@@ -353,7 +353,7 @@ if [[ "${RETURN_CODE}" -ne "0" ]]; then
 fi
 
 ################################################################################
-## 2 - run sortmerna
+## 2.2 - run sortmerna
 ################################################################################
 
 # redefine evalue for sormerna
@@ -362,7 +362,7 @@ wc -l) | bc -l)
 
 qsub -sync y -j y -o "${THIS_JOB_TMP_DIR}" -t 1-"${NFILES}" \
 -pe threaded "${NSLOTS}" -N "${SMRNA_JOBARRAYID}" \
-${MG_TRAITS_DIR}/bin/sortmerna_runner.sh --config "${CONFIG}" \
+${MG_TRAITS_DIR}/modules/sortmerna_runner.sh --config "${CONFIG}" \
 --inputdir "${THIS_JOB_TMP_DIR}" \
 --inprefix 05-part \
 --outprefix 06-part \
@@ -377,7 +377,7 @@ if [[ "${RETURN_CODE}" -ne "0" ]]; then
 fi
 
 ################################################################################
-# 3 - run SINA
+# 2.3 - run SINA
 ################################################################################
 
 NUM_RNA=$(egrep -c ">" <(cat "${THIS_JOB_TMP_DIR}"/06-part-*.fasta) )
@@ -390,7 +390,7 @@ fi
 echo "${SINA_JOBARRAYID}"
 qsub -j y -o "${THIS_JOB_TMP_DIR}" -t 1-"${NFILES}" -pe threaded "${NSLOTS}" \
 -hold_jid "${SMRNA_JOBARRAYID}" -N "${SINA_JOBARRAYID}" \
-${MG_TRAITS_DIR}/bin/sina_runner.sh --config "${CONFIG}" \
+${MG_TRAITS_DIR}/modules/sina_runner.sh --config "${CONFIG}" \
 --inputdir "${THIS_JOB_TMP_DIR}" \
 --prefix 06-part \
 --outdir "${THIS_JOB_TMP_DIR}"
@@ -402,12 +402,12 @@ if [[ "${RETURN_CODE}" -ne "0" ]]; then
 fi
 
 ################################################################################
-# 1 - Check results: fgs
+# 2.3 - Check results: fgs
 ################################################################################
 
 qsub -sync y -j y -o "${THIS_JOB_TMP_DIR}" -pe threaded "${NSLOTS}" \
 -hold_jid "${FGS_JOBARRAYID}","${SINA_JOBARRAYID}" \
-${MG_TRAITS_DIR}/bin/check_point.sh --config "${CONFIG}" \
+${MG_TRAITS_DIR}/modules/check_point.sh --config "${CONFIG}" \
 --inputdir "${THIS_JOB_TMP_DIR}" \
 --prefix1 05-part \
 --prefix2 06-part
@@ -419,14 +419,14 @@ if [[ "${RETURN_CODE}" -ne "0" ]]; then
 fi
 
 ################################################################################
-# 2 - Concatenate CDS
+# 2.4 - Concatenate CDS
 ################################################################################
 
 cat "${THIS_JOB_TMP_DIR}"/05-part*.genes.faa > "${GENEAA}"
 cat "${THIS_JOB_TMP_DIR}"/05-part*.genes.ffn > "${GENENT}"
 
 ################################################################################
-# 4 - Functional annotation
+# 2.5 - Functional annotation
 ################################################################################
 
 NUM_GENES=$( grep -c '>' "${GENENT}" )
@@ -436,7 +436,7 @@ if [[ "${NUM_GENES}" -eq "0" ]]; then
   error_exit  "No genes found by fgs. NUM_GENES = ${NUM_GENES}" 1; exit
 fi
 
-${MG_TRAITS_DIR}/bin/uproc_runner.sh --config "${CONFIG}" \
+${MG_TRAITS_DIR}/modules/uproc_runner.sh --config "${CONFIG}" \
 --input "${GENENT}" \
 --output "${PFAMFILERAW}" \
 --log "${PFAMFILERAW_LOG}"
@@ -450,10 +450,10 @@ fi
 cut -f2,7 -d ',' "${PFAMFILERAW}" > "${PFAMFILE}"
 
 ################################################################################
-# 5 - Create functional table
+# 2.6 - Create functional table
 ################################################################################
 
-${MG_TRAITS_DIR}/bin/create_fun_table.sh --config "${CONFIG}" \
+${MG_TRAITS_DIR}/modules/create_fun_table.sh --config "${CONFIG}" \
 --num_genes "${NUM_GENES}" \
 --input "${PFAMFILE}" \
 --fun_table "${FUNCTIONALTABLE}" \
@@ -470,7 +470,7 @@ sort -k1 "${FUNCTIONALTABLE}" | sed -e 's/\t/=>/g' | tr '\n' ',' | \
 sed -e 's/^/\"/' -e 's/,$/\"/' > "${PFAMDB}"
 
 ################################################################################
-# 6 - Compute codon usage
+# 2.7 - Compute codon usage
 ################################################################################
 
 cusp --auto -stdout "${GENENT}" |awk '{if ($0 !~ "*" && $0 !~ /[:alphanum:]/ \
@@ -483,10 +483,10 @@ if [[ "${RETURN_CODE}" -ne "0" ]]; then
 fi
 
 ################################################################################
-# 7 - Create codon and aa usage table
+# 2.8 - Create codon and aa usage table
 ################################################################################
 
-${MG_TRAITS_DIR}/bin/create_codon_aa_table.sh --config "${CONFIG}" \
+${MG_TRAITS_DIR}/modules/create_codon_aa_table.sh --config "${CONFIG}" \
 --input "${CODONCUSP}" \
 --aa_table "${AA_TABLE}" \
 --codon_table "${CODON_TABLE}" \
@@ -504,7 +504,7 @@ PERCTF=$(cat "${TFPERC}" )
 PERCCL=$(cat "${CLPERC}" )
 
 ################################################################################
-# 8 - Words composition: nuc frec
+# 2.9 - Words composition: nuc frec
 ################################################################################
 
 compseq --auto -stdout -word 1 "${RAW_FASTA}" | awk '{if (NF == 5 && \
@@ -519,7 +519,7 @@ if [[ "${RETURN_CODE}" -ne "0" ]]; then
 fi
 
 ################################################################################
-# 9 - Words composition: dinuc frec
+# 2.10 - Words composition: dinuc frec
 ################################################################################
 
 compseq --auto -stdout -word 2 "${RAW_FASTA}" |awk '{if (NF == 5 && \
@@ -534,10 +534,10 @@ if [[ "${RETURN_CODE}" -ne "0" ]]; then
 fi
 
 ################################################################################
-# 10 -  Create nucleotide table
+# 2.11 -  Create nucleotide table
 ################################################################################
 
-${MG_TRAITS_DIR}/bin/create_nuc_table.sh --config "${CONFIG}" \
+${MG_TRAITS_DIR}/modules/create_nuc_table.sh --config "${CONFIG}" \
 --nuc_freqs "${NUC_FREQS}" \
 --dinuc_freqs "${DINUC_FREQS}" \
 --odds_table "${ODDS_TABLE}"
@@ -549,12 +549,12 @@ if [[ "${RETURN_CODE}" -ne "0" ]]; then
 fi
 
 ################################################################################
-# 11 - Getting taxonomic classification from SINA output
+# 2.12 - Getting taxonomic classification from SINA output
 ################################################################################
 
 cat "${THIS_JOB_TMP_DIR}"/06-part-*.classify.fasta > "${GENERNA}"
 
-${MG_TRAITS_DIR}/bin/taxa_parser.sh --config "${CONFIG}" \
+${MG_TRAITS_DIR}/modules/taxa_parser.sh --config "${CONFIG}" \
 --input "${GENERNA}" \
 --slv_raw "${SLV_TAX_RAW}" \
 --slv_order "${SLV_TAX_ORDER}"
@@ -566,7 +566,7 @@ if [[ "${RETURN_CODE}" -ne "0" ]]; then
 fi
 
 ################################################################################
-# 14 - load mg_traits_codon
+# 2.13 - load mg_traits_codon
 ################################################################################
 
 db_table_load1 "${CODON_TABLE}" mg_traits_codon
@@ -579,7 +579,7 @@ if [[ "$?" -ne "0" ]]; then
 fi
 
 ################################################################################
-# 15 - load mg_traits_aa
+# 2.14 - load mg_traits_aa
 ################################################################################
 
 db_table_load2 "${AA_TABLE}" mg_traits_aa
@@ -592,7 +592,7 @@ if [[ "$?" -ne "0" ]]; then
 fi
 
 ################################################################################
-# 16 - load mg_traits_pfam
+# 2.15 - load mg_traits_pfam
 ################################################################################
 
 db_table_load1 "${PFAMDB}" mg_traits_functional
@@ -605,7 +605,7 @@ if [[ "$?" -ne "0" ]]; then
 fi
 
 ################################################################################
-# 17 - load mg_traits_taxonomy
+# 2.16 - load mg_traits_taxonomy
 ################################################################################
 
 db_table_load1 <( paste "${SLV_TAX_ORDER}" "${SLV_TAX_RAW}" ) mg_traits_taxonomy
@@ -618,7 +618,7 @@ if [[ "$?" -ne "0" ]]; then
 fi
 
 ################################################################################
-# 18 - load mg_traits_dinuc
+# 2.17 - load mg_traits_dinuc
 ################################################################################
 
 db_table_load2 "${ODDS_TABLE}" mg_traits_dinuc
@@ -631,7 +631,7 @@ if [[ "$?" -ne "0" ]]; then
 fi
 
 ################################################################################
-# # 19 - insert simple traits into mg_traits_results
+# 2.18 - insert simple traits into mg_traits_results
 ################################################################################
 
 echo "INSERT INTO epereira.mg_traits_results \
@@ -651,7 +651,7 @@ if [[ "${RETURN_CODE}" -ne "0" ]]; then
 fi
 
 ################################################################################
-# 20 - PCAs. We calculate the PCAs if we have more than 30 metagenomes in the
+# 3 - PCAs. We calculate the PCAs if we have more than 30 metagenomes in the
 # database. For functional and taxonomy we apply hellinger transformation to
 # the data before PCA
 ################################################################################
@@ -717,7 +717,7 @@ if [[ "${NUMROWS}" -ge "30" ]]; then
     exit
   fi
 
-  ${MG_TRAITS_DIR}/bin/pca.sh --config "${CONFIG}" \
+  ${MG_TRAITS_DIR}/modules/pca.sh --config "${CONFIG}" \
   --table "${PCA_CODON_FILE}" \
   --output "${PCA_CODON_DB}" \
   --id "${ID}"
@@ -728,7 +728,7 @@ if [[ "${NUMROWS}" -ge "30" ]]; then
     error_exit "Error in codon PCA. RETURN_CODE = ${RETURN_CODE}" 1; exit
   fi
 
-  ${MG_TRAITS_DIR}/bin/pca.sh --config "${CONFIG}" \
+  ${MG_TRAITS_DIR}/modules/pca.sh --config "${CONFIG}" \
   --table "${PCA_AA_FILE}" \
   --output "${PCA_AA_DB}" \
   --id "${ID}"
@@ -739,7 +739,7 @@ if [[ "${NUMROWS}" -ge "30" ]]; then
     error_exit "Error in aa PCA. RETURN_CODE = ${RETURN_CODE}" 1; exit
   fi
 
-  ${MG_TRAITS_DIR}/bin/pca.sh --config "${CONFIG}" \
+  ${MG_TRAITS_DIR}/modules/pca.sh --config "${CONFIG}" \
   --table "${PCA_DINUC_FILE}" \
   --output "${PCA_DINUC_DB}" \
   --id "${ID}"
@@ -751,7 +751,7 @@ if [[ "${NUMROWS}" -ge "30" ]]; then
   fi
 
 
-  ${MG_TRAITS_DIR}/bin/pca_data_trans.sh --config "${CONFIG}" \
+  ${MG_TRAITS_DIR}/modules/pca_data_trans.sh --config "${CONFIG}" \
   --table "${PCA_FUNCTIONAL_FILE}" \
   --output "${PCA_FUNCTIONAL_DB}" \
   --id "${ID}"
@@ -762,7 +762,7 @@ if [[ "${NUMROWS}" -ge "30" ]]; then
     error_exit "Error in aa functional. RETURN_CODE = ${RETURN_CODE}" 1; exit
   fi
 
-  ${MG_TRAITS_DIR}/bin/pca_data_trans.sh --config "${CONFIG}" \
+  ${MG_TRAITS_DIR}/modules/pca_data_trans.sh --config "${CONFIG}" \
   --table "${PCA_TAXONOMY_FILE}" \
   --output "${PCA_TAXONOMY_DB}" \
   --id "${ID}"
