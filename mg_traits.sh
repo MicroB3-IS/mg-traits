@@ -7,6 +7,7 @@
 
 START_TIME=$(date +%s.%N)
 MG_TRAITS_DIR="$(dirname "$(readlink -f "$0")")"
+MODULES="${MG_TRAITS_DIR}/modules/"
 
 # in case we do not get JOB_ID from an SGE like environment
 if [[ -z "${JOB_ID}" ]]; then
@@ -241,7 +242,8 @@ fi
 # 1.8 -  Download file
 ################################################################################
 
-"${MG_TRAITS_DIR}"/modules/file_downloader.sh --config "${CONFIG}" \
+"${MODULES}"/file_downloader.sh \
+--config "${CONFIG}" \
 --dout "${RAW_DOWNLOAD}" \
 --url "${MG_URL}" \
 --fout "${RAW_FASTA}"
@@ -257,7 +259,8 @@ fi
 # 1.9 -  Validate file
 ################################################################################
 
-${MG_TRAITS_DIR}/modules/fasta_validator.sh --config "${CONFIG}" \
+"${MODULES}"/fasta_validator.sh \
+--config "${CONFIG}" \
 --seqtype dna \
 --fastafile "${RAW_FASTA}";
 
@@ -271,7 +274,8 @@ fi
 # 1.10 - Check for duplicates
 ################################################################################
 
-${MG_TRAITS_DIR}/modules/deduplicator.sh --config "${CONFIG}" \
+"${MODULES}"/deduplicator.sh \
+--config "${CONFIG}" \
 --input "${RAW_FASTA}" \
 --output "${UNIQUE}" \
 --log "${UNIQUE_LOG}"
@@ -300,7 +304,8 @@ if [[ "$?" -ne "0" ]]; then
 fi
 
 # seq stats
-${MG_TRAITS_DIR}/modules/seq_basic_stats.sh --config "${CONFIG}" \
+"${MODULES}"/seq_basic_stats.sh \
+--config "${CONFIG}" \
 --input "${INFOSEQ_TMPFILE}" \
 --output "${INFOSEQ_MGSTATS}"
 
@@ -322,7 +327,8 @@ printf "Number of bases: %d\nGC content: %f\nGC variance: %f\n" "${NUM_BASES}"\
 # 1.12 - Split original
 ################################################################################
 
-${MG_TRAITS_DIR}/modules/fasta_splitter.sh --config "${CONFIG}" \
+"${MODULES}"/fasta_splitter.sh \
+--config "${CONFIG}" \
 --input "${RAW_FASTA}" \
 --prefix 05-part \
 --outdir "${THIS_JOB_TMP_DIR}"
@@ -339,12 +345,17 @@ fi
 
 NFILES=$(find "${THIS_JOB_TMP_DIR}" -name "05-part*.fasta" | wc -l)
 
-qsub -j y -o "${THIS_JOB_TMP_DIR}" -t 1-"${NFILES}" \
--pe threaded "${NSLOTS}" -N "${FGS_JOBARRAYID}" \
-${MG_TRAITS_DIR}/modules/fgs_runner.sh --config "${CONFIG}" \
---inputdir "${THIS_JOB_TMP_DIR}" \
---prefix 05-part \
---outdir "${THIS_JOB_TMP_DIR}"
+qsub \
+-j y \
+-o "${THIS_JOB_TMP_DIR}" \
+-t 1-"${NFILES}" \
+-pe threaded "${NSLOTS}" \
+-N "${FGS_JOBARRAYID}" \
+"${MODULES}"/fgs_runner.sh \
+  --config "${CONFIG}" \
+  --inputdir "${THIS_JOB_TMP_DIR}" \
+  --prefix 05-part \
+  --outdir "${THIS_JOB_TMP_DIR}"
 
 RETURN_CODE=$?
 if [[ "${RETURN_CODE}" -ne "0" ]]; then
@@ -360,14 +371,20 @@ fi
 EVALUE=$( echo 1 / $(find "${THIS_JOB_TMP_DIR}" -name "05-part-[0-9]*.fasta" |\
 wc -l) | bc -l)
 
-qsub -sync y -j y -o "${THIS_JOB_TMP_DIR}" -t 1-"${NFILES}" \
--pe threaded "${NSLOTS}" -N "${SMRNA_JOBARRAYID}" \
-${MG_TRAITS_DIR}/modules/sortmerna_runner.sh --config "${CONFIG}" \
---inputdir "${THIS_JOB_TMP_DIR}" \
---inprefix 05-part \
---outprefix 06-part \
---outdir "${THIS_JOB_TMP_DIR}" \
---evalue "${EVALUE}" > sortmerna_runner.log
+qsub \
+-sync y \
+-j y \
+-o "${THIS_JOB_TMP_DIR}" \
+-t 1-"${NFILES}" \
+-pe threaded "${NSLOTS}" \
+-N "${SMRNA_JOBARRAYID}" \
+"${MODULES}"/sortmerna_runner.sh \
+  --config "${CONFIG}" \
+  --inputdir "${THIS_JOB_TMP_DIR}" \
+  --inprefix 05-part \
+  --outprefix 06-part \
+  --outdir "${THIS_JOB_TMP_DIR}" \
+  --evalue "${EVALUE}" > sortmerna_runner.log
 
 RETURN_CODE="$?"
 if [[ "${RETURN_CODE}" -ne "0" ]]; then
@@ -388,12 +405,18 @@ if [[ "${NUM_RNA}" -eq "0" ]]; then
 fi
 
 echo "${SINA_JOBARRAYID}"
-qsub -j y -o "${THIS_JOB_TMP_DIR}" -t 1-"${NFILES}" -pe threaded "${NSLOTS}" \
--hold_jid "${SMRNA_JOBARRAYID}" -N "${SINA_JOBARRAYID}" \
-${MG_TRAITS_DIR}/modules/sina_runner.sh --config "${CONFIG}" \
---inputdir "${THIS_JOB_TMP_DIR}" \
---prefix 06-part \
---outdir "${THIS_JOB_TMP_DIR}"
+qsub \
+-j y \
+-o "${THIS_JOB_TMP_DIR}" \
+-t 1-"${NFILES}" \
+-pe threaded "${NSLOTS}" \
+-hold_jid "${SMRNA_JOBARRAYID}" \
+-N "${SINA_JOBARRAYID}" \
+"${MODULES}"/sina_runner.sh \
+  --config "${CONFIG}" \
+  --inputdir "${THIS_JOB_TMP_DIR}" \
+  --prefix 06-part \
+  --outdir "${THIS_JOB_TMP_DIR}"
 
 RETURN_CODE=$?
 if [[ "${RETURN_CODE}" -ne "0" ]]; then
@@ -405,12 +428,17 @@ fi
 # 2.3 - Check results: fgs
 ################################################################################
 
-qsub -sync y -j y -o "${THIS_JOB_TMP_DIR}" -pe threaded "${NSLOTS}" \
+qsub \
+-sync y \
+-j y \
+-o "${THIS_JOB_TMP_DIR}" \
+-pe threaded "${NSLOTS}" \
 -hold_jid "${FGS_JOBARRAYID}","${SINA_JOBARRAYID}" \
-${MG_TRAITS_DIR}/modules/check_point.sh --config "${CONFIG}" \
---inputdir "${THIS_JOB_TMP_DIR}" \
---prefix1 05-part \
---prefix2 06-part
+"${MODULES}"/check_point.sh \
+  --config "${CONFIG}" \
+  --inputdir "${THIS_JOB_TMP_DIR}" \
+  --prefix1 05-part \
+  --prefix2 06-part
 
 RETURN_CODE="$?"
 if [[ "${RETURN_CODE}" -ne "0" ]]; then
@@ -436,7 +464,8 @@ if [[ "${NUM_GENES}" -eq "0" ]]; then
   error_exit  "No genes found by fgs. NUM_GENES = ${NUM_GENES}" 1; exit
 fi
 
-${MG_TRAITS_DIR}/modules/uproc_runner.sh --config "${CONFIG}" \
+"${MODULES}"/uproc_runner.sh \
+--config "${CONFIG}" \
 --input "${GENENT}" \
 --output "${PFAMFILERAW}" \
 --log "${PFAMFILERAW_LOG}"
@@ -453,7 +482,8 @@ cut -f2,7 -d ',' "${PFAMFILERAW}" > "${PFAMFILE}"
 # 2.6 - Create functional table
 ################################################################################
 
-${MG_TRAITS_DIR}/modules/create_fun_table.sh --config "${CONFIG}" \
+"${MODULES}"/create_fun_table.sh \
+--config "${CONFIG}" \
 --num_genes "${NUM_GENES}" \
 --input "${PFAMFILE}" \
 --fun_table "${FUNCTIONALTABLE}" \
@@ -486,7 +516,8 @@ fi
 # 2.8 - Create codon and aa usage table
 ################################################################################
 
-${MG_TRAITS_DIR}/modules/create_codon_aa_table.sh --config "${CONFIG}" \
+"${MODULES}"/create_codon_aa_table.sh \
+--config "${CONFIG}" \
 --input "${CODONCUSP}" \
 --aa_table "${AA_TABLE}" \
 --codon_table "${CODON_TABLE}" \
@@ -537,7 +568,8 @@ fi
 # 2.11 -  Create nucleotide table
 ################################################################################
 
-${MG_TRAITS_DIR}/modules/create_nuc_table.sh --config "${CONFIG}" \
+"${MODULES}"/create_nuc_table.sh \
+--config "${CONFIG}" \
 --nuc_freqs "${NUC_FREQS}" \
 --dinuc_freqs "${DINUC_FREQS}" \
 --odds_table "${ODDS_TABLE}"
@@ -554,7 +586,8 @@ fi
 
 cat "${THIS_JOB_TMP_DIR}"/06-part-*.classify.fasta > "${GENERNA}"
 
-${MG_TRAITS_DIR}/modules/taxa_parser.sh --config "${CONFIG}" \
+"${MODULES}"/taxa_parser.sh \
+--config "${CONFIG}" \
 --input "${GENERNA}" \
 --slv_raw "${SLV_TAX_RAW}" \
 --slv_order "${SLV_TAX_ORDER}"
@@ -717,7 +750,7 @@ if [[ "${NUMROWS}" -ge "30" ]]; then
     exit
   fi
 
-  ${MG_TRAITS_DIR}/modules/pca.sh --config "${CONFIG}" \
+  "${MODULES}"/pca.sh --config "${CONFIG}" \
   --table "${PCA_CODON_FILE}" \
   --output "${PCA_CODON_DB}" \
   --id "${ID}"
@@ -728,7 +761,7 @@ if [[ "${NUMROWS}" -ge "30" ]]; then
     error_exit "Error in codon PCA. RETURN_CODE = ${RETURN_CODE}" 1; exit
   fi
 
-  ${MG_TRAITS_DIR}/modules/pca.sh --config "${CONFIG}" \
+  "${MODULES}"/pca.sh --config "${CONFIG}" \
   --table "${PCA_AA_FILE}" \
   --output "${PCA_AA_DB}" \
   --id "${ID}"
@@ -739,7 +772,7 @@ if [[ "${NUMROWS}" -ge "30" ]]; then
     error_exit "Error in aa PCA. RETURN_CODE = ${RETURN_CODE}" 1; exit
   fi
 
-  ${MG_TRAITS_DIR}/modules/pca.sh --config "${CONFIG}" \
+  "${MODULES}"/pca.sh --config "${CONFIG}" \
   --table "${PCA_DINUC_FILE}" \
   --output "${PCA_DINUC_DB}" \
   --id "${ID}"
@@ -751,7 +784,7 @@ if [[ "${NUMROWS}" -ge "30" ]]; then
   fi
 
 
-  ${MG_TRAITS_DIR}/modules/pca_data_trans.sh --config "${CONFIG}" \
+  "${MODULES}"/pca_data_trans.sh --config "${CONFIG}" \
   --table "${PCA_FUNCTIONAL_FILE}" \
   --output "${PCA_FUNCTIONAL_DB}" \
   --id "${ID}"
@@ -762,7 +795,7 @@ if [[ "${NUMROWS}" -ge "30" ]]; then
     error_exit "Error in aa functional. RETURN_CODE = ${RETURN_CODE}" 1; exit
   fi
 
-  ${MG_TRAITS_DIR}/modules/pca_data_trans.sh --config "${CONFIG}" \
+  "${MODULES}"/pca_data_trans.sh --config "${CONFIG}" \
   --table "${PCA_TAXONOMY_FILE}" \
   --output "${PCA_TAXONOMY_DB}" \
   --id "${ID}"
