@@ -13,6 +13,8 @@ if [[ -z "${JOB_ID}" ]]; then
    JOB_ID="${RANDOM}"
 fi
 
+touch /bioinf/projects/megx/mg-traits/mg-traits_dev/test_run
+
 ################################################################################
 # 0 - Load general configuration
 ################################################################################
