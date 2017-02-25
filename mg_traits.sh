@@ -145,6 +145,7 @@ INFOSEQ_MGSTATS="${THIS_JOB_TMP_DIR}/04-mg_stats"
 GENEAA="${THIS_JOB_TMP_DIR}/05-gene.faa"
 GENENT="${THIS_JOB_TMP_DIR}/05-gene.ffn"
 GENERNA="${THIS_JOB_TMP_DIR}/06-gene-rna-seqs.fasta"
+SORTMERNA_LOG="${THIS_JOB_TMP_DIR}/sortmerna_runner.log"
 
 PFAMDB="${THIS_JOB_TMP_DIR}/07-pfamdb"
 BGCDB="${THIS_JOB_TMP_DIR}/07-bgcdb"
@@ -439,7 +440,7 @@ fi
 ## 2.2 - run sortmerna
 ################################################################################
 
-# redefine evalue for sormerna
+# redefine evalue for sortmerna
 EVALUE=$( echo 1 / $(find "${THIS_JOB_TMP_DIR}" -name "05-part-[0-9]*.fasta" |\
 wc -l) | bc -l)
 
@@ -455,7 +456,7 @@ qsub \
   --inprefix 05-part \
   --outprefix 06-part \
   --outdir "${THIS_JOB_TMP_DIR}" \
-  --evalue "${EVALUE}" > sortmerna_runner.log
+  --evalue "${EVALUE}" > "${SORTMERNA_LOG}"
 
 RETURN_CODE="$?"
 if [[ "${RETURN_CODE}" -ne "0" ]]; then
@@ -538,7 +539,7 @@ if [[ "${RETURN_CODE}" != "0" ]]; then
 fi
 
 ################################################################################
-# 2.3 - Check results: fgs, sormerna, sina
+# 2.3 - Check results: fgs, sortmerna, sina
 ################################################################################
 
 qsub \
@@ -780,8 +781,6 @@ fi
 #   error_exit "Error inserting BGCDB results. RETURN_CODE = ${RETURN_CODE}" 1;
 #   exit
 # fi
-
-
 
 ################################################################################
 # 2.16 - load mg_traits_taxonomy
