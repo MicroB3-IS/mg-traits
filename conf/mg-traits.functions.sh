@@ -10,6 +10,12 @@ EOF
 }
 
 
+function cleanup {
+rsync -a --remove-source-files "${THIS_JOB_TMP_DIR}" "${FAILED_JOBS_DIR}"
+rmdir "${THIS_JOB_TMP_DIR}"
+}
+
+
 function error_exit() {
   local msg=${1}
   local exit_code=${2}
@@ -24,7 +30,7 @@ function error_exit() {
 }
 
 function db_error_comm() {
-  echo "UPDATE mg_traits.mg_traits_jobs SET time_finished = now(), \
+  echo "UPDATE ${schema}.mg_traits_jobs SET time_finished = now(), \
   return_code = 1, error_message = '${1}' WHERE sample_label = \
   '${SAMPLE_LABEL}' AND id = '${ID}';" | psql -U "${target_db_user}" -h \
   "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}"
@@ -33,13 +39,6 @@ function db_error_comm() {
 ##########################
 ### 2 - functions
 #########################
-
-function cleanup {
-if [[ -f ${TMP_VOL_FILE} ]];then
-mv "${TMP_VOL_FILE}" "${THIS_JOB_TMP_DIR}"
-fi
-mv -f "${THIS_JOB_TMP_DIR}" "${FAILED_JOBS_DIR}"
-}
 
 
 function check_required_programs() {
@@ -118,7 +117,7 @@ function db_table_load1() {
   tail -n1 "${1}" | awk -vI="${ID}" -vO="${SAMPLE_LABEL}" \
   '{print I"\t"O"\t"$0}' | psql -U "${target_db_user}" \
   -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}" \
-  -c "\COPY mg_traits.${2} FROM STDIN CSV delimiter E'\t'"
+  -c "\COPY ${schema}.${2} FROM STDIN CSV delimiter E'\t'"
 }
 
 ### CHANGE SCHEMA TO mg_traits!!!!
@@ -126,7 +125,7 @@ function db_table_load2() {
   tail -n1 "${1}" | awk -vI="${ID}" -vO="${SAMPLE_LABEL}" \
   '{print O"\t"$0"\t"I}' | psql -U "${target_db_user}" \
   -h "${target_db_host}" -p "${target_db_port}" -d "${target_db_name}" \
-  -c "\COPY mg_traits.${2} FROM STDIN CSV delimiter E'\t'"
+  -c "\COPY ${schema}.${2} FROM STDIN CSV delimiter E'\t'"
 }
 
 
@@ -152,7 +151,7 @@ data_retriever2() {
 function db_pca_load() {
  cat "${1}" | psql -U "${target_db_user}" -h "${target_db_host}" \
  -p "${target_db_port}" -d "${target_db_name}" \
- -c "\COPY mg_traits.mg_traits_pca FROM STDIN CSV delimiter E'\t'"
+ -c "\COPY ${schema}.mg_traits_pca FROM STDIN CSV delimiter E'\t'"
 }
 
 trap cleanup SIGINT SIGKILL SIGTERM
