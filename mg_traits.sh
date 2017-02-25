@@ -82,37 +82,37 @@ done
 # 1.2 - Initial insert
 ################################################################################
 
-if [[ -n "${target_db_name}" ]]; then
-
-  INSERT_DB=$( \
-  echo "INSERT INTO ${schema}.mg_traits_jobs VALUES ( \
-  'anonymous',\
-  '${MG_URL}',\
-  '${SAMPLE_LABEL}',\
-  'marine');" \
-  | psql \
-  -U "${target_db_user}" \
-  -h "${target_db_host}" \
-  -p "${target_db_port}" \
-  -d "${target_db_name}")
-
-  if [[ "$?" -ne "0" ]]; then
-     mail -s "Cannot insert into database. Output:${INSERT_DB}"; exit
-  fi
-
-  ID=$( echo "SELECT id FROM ${schema}.mg_traits_jobs WHERE \
-  sample_label = '${SAMPLE_LABEL}';" | psql \
-  -t \
-  -U "${target_db_user}" \
-  -h "${target_db_host}" \
-  -p "${target_db_port}" \
-  -d "${target_db_name}" )
-
-   if [[ "$?" -ne "0" ]]; then
-     mail -s "Cannot get id from database. Output:${INSERT_DB}"; exit
-   fi
-
-fi
+# if [[ -n "${target_db_name}" ]]; then
+# 
+#   INSERT_DB=$( \
+#   echo "INSERT INTO ${schema}.mg_traits_jobs VALUES ( \
+#   'anonymous',\
+#   '${MG_URL}',\
+#   '${SAMPLE_LABEL}',\
+#   'marine');" \
+#   | psql \
+#   -U "${target_db_user}" \
+#   -h "${target_db_host}" \
+#   -p "${target_db_port}" \
+#   -d "${target_db_name}")
+# 
+#   if [[ "$?" -ne "0" ]]; then
+#      mail -s "Cannot insert into database. Output:${INSERT_DB}"; exit
+#   fi
+# 
+#   ID=$( echo "SELECT id FROM ${schema}.mg_traits_jobs WHERE \
+#   sample_label = '${SAMPLE_LABEL}';" | psql \
+#   -t \
+#   -U "${target_db_user}" \
+#   -h "${target_db_host}" \
+#   -p "${target_db_port}" \
+#   -d "${target_db_name}" )
+# 
+#    if [[ "$?" -ne "0" ]]; then
+#      mail -s "Cannot get id from database. Output:${INSERT_DB}"; exit
+#    fi
+# 
+# fi
 
 ################################################################################
 # 1.3 - Set mg traits job specific variables
