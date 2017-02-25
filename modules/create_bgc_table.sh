@@ -1,9 +1,9 @@
 #!/bin/bash
 ################################################################################
 ################################################################################
-# DESCRIPTION: this script deduplicates a fasta file
-# DEPENDENCIES: vsearch
-# CONFIGURATION VARIABLES: ${vsearch_version}
+# DESCRIPTION: this script creates the functional annotation table
+# DEPENDENCIES: R
+# CONFIGURATION VARIABLES: ${r_interpreter}, ${BGC_DOMAINS}
 # EXIT CODES:
 # 0    no errors
 # 1    input/output error
@@ -14,14 +14,16 @@
 
 show_usage(){
   cat <<EOF
-  Usage: ${0##*/} [-h] [-c|--config FILE] [-i|--input FILE] [-l|--log FILE] \
-[-o|--output FILE]
+  Usage: ${0##*/} [-h] [-c|--config FILE] [-i|--input FILE] \
+[-f|--fun_table FILE] [-n|--num_genes NUMBER]  [-t|--tfperc FILE ] \
+[-r|--cfperc FILE]
 
   -c|--config        configuration file
   -h|--help          display this help and exit
-  -i|--input         input fasta file
-  -l|--log           log file
-  -o|--output        output fasta file
+  -f|--fun_table     output functional table
+  -n|--num_genes     number of found genes
+  -r|--clperc        classified reads percentage
+  -t|--tfperc        transcriptional factors percentage
 EOF
 }
 
@@ -47,23 +49,30 @@ read_config(){
 }
 
 
-function deduplicate_fasta() {
+function create_fun_table() {
 
-  local INPUT="${1}"
-  local OUTPUT="${2}"
-  local LOG="${3}"
+  local NUM_GENES="${1}"
+  local BGCFILE="${2}"
+  local FUNCTIONALTABLE="${3}"
 
-  if [[ ! -r "${INPUT}" ]]; then
-    echo "${INPUT} doesn't exist or is not readable"
-  fi
-
-
-  ${vsearch} \
-  --derep_fulllength "${INPUT}" \
-  --notrunclabels \
-  --output "${OUTPUT}" \
-  --log "${LOG}" \
-  --threads "${NSLOTS}"
+  "${r_interpreter}" --vanilla --slave <<RSCRIPT
+  n.genes<-as.numeric("${NUM_GENES}")
+  t<-read.table(file = '${BGCFILE}', header = F, stringsAsFactors=F, sep=",")
+  colnames(t)<-c("seq_id", "bgc_dom")
+  perc.cl<-(length(unique(t[,1]))/n.genes)*100
+  t<-subset(t, select = "bgc_dom")
+  p<-read.table(file = '${BGC_DOMAINS}', header = F, stringsAsFactors=F)
+  colnames(p)<-'bgc_dom'
+  t.t<-as.data.frame(table(t\$bgc_dom))
+  colnames(t.t)<-c("bgc_dom", "counts")
+  t.m<-merge(p, t.t, all = T, by= "bgc_dom")
+  t.m[is.na(t.m)]<-0
+  colnames(t.m)<-c("bgc_dom", "counts")
+  write.table(t.m, file = '${FUNCTIONALTABLE}', sep = "\t", row.names = F, \
+  quote = F, col.names = F)
+  write.table(perc.cl, file = '${CLPERC}', sep = "\t", row.names = F, \
+  quote = F, col.names = F)
+RSCRIPT
 
 
   EXIT_CODE="$?"
@@ -75,15 +84,19 @@ main(){
     read_config "${CONFIG_FILE}"
   fi
 
-  deduplicate_fasta "${INPUT}" "${OUTPUT}" "${LOG}"
+
+  create_fun_table "${NUM_GENES}" "${INPUT}" "${FUNCTIONALTABLE}" "${TFPERC}" \
+  "${CLPERC}"
+
 
   if [[ "${EXIT_CODE}" -eq "0" ]]; then
-    echo "Deduplicate successful"
+    echo "functional table successful"
   else
-    echo "Decuplicate failed"
+    echo "functional table failed"
   fi
   exit "${EXIT_CODE}"
 }
+
 
 if  [[ "$#" -eq 0 ]]; then
     show_usage
@@ -101,7 +114,7 @@ while :; do
     show_usage
     exit
     ;;
-##############
+################
    -c|--config) # Takes an option argument, ensuring it has been specified.
     if [ -n "${2}" ]; then
       CONFIG_FILE="${2}"
@@ -118,7 +131,7 @@ while :; do
     --config=) # Handle the case of an empty --file=
     printf 'WARN: Using default environment.\n' >&2
     ;;
-##############
+###########
     -i|--input) # Takes an option argument, ensuring it has been
                 # specified.
     if [[ -n "${2}" ]]; then
@@ -136,42 +149,61 @@ while :; do
     printf 'ERROR: "--input" requires a non-empty option argument.\n' >&2
     exit 1
     ;;
-##############
-    -l|--log)  # Takes an option argument, ensuring it has been specified.
-    if [[ -n "${2}" ]]; then
-      LOG="${2}"
-      shift
-    else
-      printf 'ERROR: "--log" requires a non-empty option argument.\n' >&2
-      exit 1
-    fi
-    ;;
-    --log=?*)
-    LOG=${1#*=} # Delete everything up to "=" and assign the remainder.
-    ;;
-    --log=)         # Handle the case of an empty --file=
-    printf 'ERROR: "--log" requires a non-empty option argument.\n' >&2
-    exit 1
-    ;;
-##############
-    -o|--output) # Takes an option argument, ensuring it has been
+##########
+    -f|--fun_table) # Takes an option argument, ensuring it has been
                  # specified.
     if [[ -n "${2}" ]]; then
-      OUTPUT="${2}"
+      FUNCTIONALTABLE="${2}"
       shift
     else
-      printf 'ERROR: "--output" requires a non-empty option argument.\n' >&2
+      printf 'ERROR: "--fun_table" requires a non-empty option argument.\n' >&2
       exit 1
     fi
     ;;
-    --output=?*)
-    OUTPUT=${1#*=} # Delete everything up to "=" and assign the remainder.
+    --fun_table=?*)
+    FUNCTIONALTABLE=${1#*=} # Delete everything up to "=" and assign the
+                            # remainder.
     ;;
-    --output=)     # Handle the case of an empty --file=
-    printf 'ERROR: "--output" requires a non-empty option argument.\n' >&2
+    --fun_table=)     # Handle the case of an empty --file=
+    printf 'ERROR: "--fun_table" requires a non-empty option argument.\n' >&2
     exit 1
     ;;
-##############
+###########
+    -n|--num_genes)  # Takes an option argument, ensuring it has been specified.
+    if [[ -n "${2}" ]]; then
+      NUM_GENES="${2}"
+      shift
+    else
+      printf 'ERROR: "--num_genes" requires a non-empty option argument.\n' >&2
+      exit 1
+    fi
+    ;;
+    --num_genes=?*)
+    NUM_GENES=${1#*=} # Delete everything up to "=" and assign the remainder.
+    ;;
+    --num_genes=)         # Handle the case of an empty --file=
+    printf 'ERROR: "--num_genes" requires a non-empty option argument.\n' >&2
+    exit 1
+    ;;
+#############
+    -r|--clperc)  # Takes an option argument, ensuring it has been
+                 # specified.
+    if [[ -n "${2}" ]]; then
+      CLPERC="${2}"
+      shift
+    else
+      printf 'ERROR: "--clperc" requires a non-empty option argument.\n' >&2
+      exit 1
+    fi
+    ;;
+    --clperc=?*)
+    CLPERC=${1#*=} # Delete everything up to "=" and assign the remainder.
+    ;;
+    --clperc=)         # Handle the case of an empty --file=
+    printf 'ERROR: "--clperc" requires a non-empty option argument.\n' >&2
+    exit 1
+    ;;
+################
     --)              # End of all options.
     shift
     break
@@ -186,4 +218,11 @@ while :; do
 done
 
 main "$@"
+
+
+
+
+
+
+
 

@@ -1,27 +1,26 @@
 #!/bin/bash
 ################################################################################
 ################################################################################
-# DESCRIPTION: this script runs FragGeneScan
-# DEPENDENCIES: FragGeneScan
-# CONFIGURATION VARIABLES: ${frag_gene_scan_version}, ${NSLOTS}
+# DESCRIPTION: this script runs UProC
+# DEPENDENCIES: uproc
+# CONFIGURATION VARIABLES: ${uproc_version}, ${uproc_pfam}, ${uproc_model}
 # EXIT CODES:
-# 0    valid input
-# 1    input/ouput error
-# 5    config file not found or readable
-# 6    config file error format
+# 0    no errors
+# 1    input/output error
+# 5    no config file found or readable
+# 6    config file format error
 ################################################################################
 ################################################################################
-
 show_usage(){
   cat <<EOF
-  Usage: ${0##*/} [-h] [-c|--config FILE] [-i|--inputdir DIR] \
-[-o|--outdir DIR] [-p|--prefix STRIG]
+  Usage: ${0##*/} [-h] [-c|--config FILE] [-i|--input FILE] [-o|--output FILE] \
+[-l|--log FILE] 
 
-  -c|--config        configuration file
   -h|--help          display this help and exit
-  -i|--inputdir      input directory: where files are
-  -o|--outdir        output directory
-  -p|--prefix        fasta file input prefix
+  -c|--config        configuration file
+  -i|--input         input fasta file
+  -l|--log           log file
+  -o|--output        output annotation file
 EOF
 }
 
@@ -30,7 +29,7 @@ read_config(){
 
   if [[ ! -r "${CONFIG_FILE}" ]]; then
     echo "${CONFIG_FILE} doesn't exist or is not readable"
-    exit 5
+    exit 1
   fi
 
   CONFIG_SYNTAX="^\s*#|^\s*$|^[0-9a-zA-Z_]+=\"[^\"]*$|^[0-9a-zA-Z_]+\=\"[^\"]\
@@ -40,19 +39,18 @@ read_config(){
     echo "Error parsing config file ${CONFIG_FILE}." >&2
     echo "The following lines in the configfile do not fit the syntax:" >&2
     egrep -vn "${CONFIG_SYNTAX}" "$CONFIG_FILE"
-    exit 6
+    exit 5
   fi
 
   source "${CONFIG_FILE}"
 }
 
 
-
-
-function fgs() {
+function uproc {
 
   local INPUT="${1}"
   local OUTPUT="${2}"
+  local LOG="${3}"
 
   if [[ ! -r "${INPUT}" ]]; then
     echo "${INPUT} doesn't exist or is not readable"
@@ -60,11 +58,12 @@ function fgs() {
 
   ##### load fraggenescan module #####
   source /bioinf/software/etc/profile.modules
-  module load fraggenescan/"${frag_gene_scan_version}"
+  module load uproc/"${uproc_version}"
   ##### load fraggenescan module #####
 
-  "${frag_gene_scan}" -genome="${INPUT}" -out="${OUTPUT}" \
-  -complete=0 -train=illumina_5 -thread="${NSLOTS}"
+
+  "${uproc}" -t "${NSLOTS}" -p -l -O 2 -P 3 -o "${OUTPUT}" "${uproc_pfam}"\
+  "${uproc_model}" "${INPUT}" > "${LOG}"
 
   EXIT_CODE="$?"
 }
@@ -75,19 +74,19 @@ main(){
     read_config "${CONFIG_FILE}"
   fi
 
-  INPUT="${INPUTDIR}"/"${PREFIX}"-"${SGE_TASK_ID}".fasta
-  OUTPUT="${OUTDIR}"/"${PREFIX}"-"${SGE_TASK_ID}".genes
 
-  fgs "${INPUT}" "${OUTPUT}"
+  INPUT="${INPUTDIR}"/"${PREFIX}"-"${SGE_TASK_ID}".genes.ffn
+  OUTPUT="${OUTDIR}"/"${PREFIX}"-"${SGE_TASK_ID}"-pfam-raw
+
+  uproc "${INPUT}" "${OUTPUT}" "${LOG}"
 
   if [[ "${EXIT_CODE}" -eq "0" ]]; then
-    echo "fraggenescan successful"
+    echo "Uproc successful"
   else
-    echo "fraggenescan failed"
+    echo "Uproc failed"
   fi
   exit "${EXIT_CODE}"
 }
-
 
 if  [[ "$#" -eq 0 ]]; then
     show_usage
@@ -105,7 +104,7 @@ while :; do
     show_usage
     exit
     ;;
-############
+#############
    -c|--config) # Takes an option argument, ensuring it has been specified.
     if [ -n "${2}" ]; then
       CONFIG_FILE="${2}"
@@ -122,7 +121,7 @@ while :; do
     --config=) # Handle the case of an empty --file=
     printf 'WARN: Using default environment.\n' >&2
     ;;
-############
+#############
     -i|--inputdir) # Takes an option argument, ensuring it has been
                 # specified.
     if [[ -n "${2}" ]]; then
@@ -140,7 +139,24 @@ while :; do
     printf 'ERROR: "--inputdir" requires a non-empty option argument.\n' >&2
     exit 1
     ;;
-############
+#############
+    -l|--log)  # Takes an option argument, ensuring it has been specified.
+    if [[ -n "${2}" ]]; then
+      LOG="${2}"
+      shift
+    else
+      printf 'ERROR: "--log" requires a non-empty option argument.\n' >&2
+      exit 1
+    fi
+    ;;
+    --log=?*)
+    LOG=${1#*=} # Delete everything up to "=" and assign the remainder.
+    ;;
+    --log=)         # Handle the case of an empty --file=
+    printf 'ERROR: "--log" requires a non-empty option argument.\n' >&2
+    exit 1
+    ;;
+#############
     -o|--outdir) # Takes an option argument, ensuring it has been
                  # specified.
     if [[ -n "${2}" ]]; then
@@ -158,7 +174,7 @@ while :; do
     printf 'ERROR: "--outdir" requires a non-empty option argument.\n' >&2
     exit 1
     ;;
-############
+#############
     -p|--prefix)  # Takes an option argument, ensuring it has been specified.
     if [[ -n "${2}" ]]; then
       PREFIX="${2}"
@@ -175,7 +191,7 @@ while :; do
     printf 'ERROR: "--prefix" requires a non-empty option argument.\n' >&2
     exit 1
     ;;
-############
+#############
     --)              # End of all options.
     shift
     break

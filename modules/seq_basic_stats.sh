@@ -51,7 +51,7 @@ function seq_basic_stats() {
   local INFOSEQ_TMPFILE="${1}"
   local INFOSEQ_MGSTATS="${2}"
 
-  "${r_interpreter}" --vanilla --slave <<RSCRIPT
+  R --vanilla --slave <<RSCRIPT
   t<-read.table(file = "${INFOSEQ_TMPFILE}", header = F)
   bp<-sum(as.numeric(t[,1]))
   meanGC<-mean(as.numeric(t[,2]))

@@ -3,7 +3,7 @@
 ################################################################################
 # DESCRIPTION: this script chacks if the fasta file is valid
 # DEPENDENCIES: FastaValidator
-# CONFIGURATION VARIABLES: ${FASTA_VALIDATOR}
+# CONFIGURATION VARIABLES: ${fasta_validator}
 # EXIT CODES:
 # 0    no errors
 # 1    unknown error
@@ -54,7 +54,7 @@ validate_fasta(){
     echo "${SFILE} doesn't exist or is not readable"
   fi
 
-  java -jar "${FASTA_VALIDATOR}" -nogui -f "${SFILE}" -t "${STYPE}"
+  java -jar "${fasta_validator}" -nogui -f "${SFILE}" -t "${STYPE}"
   EXIT_CODE="$?"
 }
 

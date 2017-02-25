@@ -57,20 +57,33 @@ function download() {
   local URL="${1}"
   local RAW_DOWNLOAD="${2}"
 
-  set +H
-  local REGEX="(https?|ftp|file)://[-A-Za-z0-9\+&@#/%?=~_|!:,.;]*\
-[-A-Za-z0-9\+&@#/%=~_|]"
-  set -H
-
-  if [[ ! "${URL}" =~ ${REGEX} ]]; then
-    echo "not valid url: ${URL}"
-    echo "${REGEX}"
-    exit 1
-  fi
+#   set +H
+#   local REGEX="(https?|ftp|file)://[-A-Za-z0-9\+&@#/%?=~_|!:,.;]*\
+# [-A-Za-z0-9\+&@#/%=~_|]"
+#   set -H
+# 
+#   if [[ ! "${URL}" =~ ${REGEX} ]]; then
+#     echo "not valid url: ${URL}"
+#     echo "${REGEX}"
+#     exit 1
+#   fi
 
   # download MG_URL
-  curl -sf "${URL}" > "${RAW_DOWNLOAD}"
-  EXIT_CODE="$?"
+   if [[ "${URL}" =~ ^file ]] || \
+      [[ "${URL}" =~ ^http ]] || \
+      [[ "${URL}" =~ ^ftp ]]; then
+
+    curl -sf "${URL}" > "${RAW_DOWNLOAD}"
+    EXIT_CODE="$?"
+
+  else 
+   rsync -a "${URL}" "${RAW_DOWNLOAD}"
+   EXIT_CODE="$?"
+  fi
+
+#    ln -s "${URL/file:\/\//}" "${RAW_DOWNLOAD}"
+#    EXIT_CODE="$?"
+
 
   FILE_TYPE=$(file -b --mime-type "${RAW_DOWNLOAD}")
 
@@ -85,7 +98,7 @@ function download() {
 
   elif [[ "${FILE_TYPE}" == "application/x-bzip2" ]]; then
     bzip2 -c -d "${RAW_DOWNLOAD}" > "${RAW_FASTA}";
- 
+
   elif [[ "${FILE_TYPE}" == "application/x-7z-compressed" ]]; then
     7z e -so "${RAW_DOWNLOAD}" > "${RAW_FASTA}";
 
