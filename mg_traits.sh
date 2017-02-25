@@ -117,7 +117,8 @@ fi
 ################################################################################
 # 1.3 - Set mg traits job specific variables
 ################################################################################
-THIS_JOB_TMP_DIR=$(readlink -m "${RUNNING_JOBS_DIR}/${SAMPLE_LABEL}")
+
+THIS_JOB_TMP_DIR=$(readlink -m "${RUNNING_JOBS_DIR}/${SAMPLE_LABEL}-${JOB_ID}")
 THIS_JOB_TMP_DIR_DATA="${THIS_JOB_TMP_DIR}/data/"
 SINA_LOG_DIR="${THIS_JOB_TMP_DIR}/sina_log"
 FGS_JOBARRAYID="mt-${JOB_ID}-fgs"
