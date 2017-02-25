@@ -1,8 +1,6 @@
 #!/bin/bash
 
-# # $ -l mg_traits=1
-
-# set +x
+ set -x
 # set -o pipefail
 
 START_TIME=$(date +%s.%N)
@@ -11,7 +9,7 @@ MODULES="${MG_TRAITS_DIR}/modules/"
 
 # in case we do not get JOB_ID from an SGE like environment
 if [[ -z "${JOB_ID}" ]]; then
-  #JOB_ID=$(date +%s.%N | sha256sum | base64 | head -c 10 )
+  JOB_ID=$(date +%s.%N | sha256sum | base64 | head -c 10 )
    JOB_ID="${RANDOM}"
 fi
 
@@ -39,7 +37,7 @@ if [[ -z "${1}" ]]; then
 fi
 
 # urldecode input
-declare INPUT=$(echo "$1" | sed -e 's/&/|/g' -e 's/\+/ /g' -e 's/%25/%/g' \
+declare INPUT=$(echo "${1}" | sed -e 's/&/|/g' -e 's/\+/ /g' -e 's/%25/%/g' \
 -e 's/%20/ /g' -e 's/%09/ /g' -e 's/%21/!/g' -e 's/%22/"/g' -e 's/%23/#/g' \
 -e 's/%24/\$/g' -e 's/%26/\&/g' -e 's/%27/'\''/g' -e 's/%28/(/g' \
 -e 's/%29/)/g' -e 's/%2a/\*/g' -e 's/%2b/+/g' -e 's/%2c/,/g' -e 's/%2d/-/g' \
@@ -49,26 +47,25 @@ declare INPUT=$(echo "$1" | sed -e 's/&/|/g' -e 's/\+/ /g' -e 's/%25/%/g' \
 -e 's/%7c/|/g' -e 's/%7d/}/g' -e 's/%7e/~/g' -e 's/%09/      /g')
 
 IFS="|"
-
 declare -A params;
-# parse input
+  # parse input
 for pair in ${INPUT}; do
-   key=${pair%%=*};
-   key=${key,,};
-   val=${pair#*=}
-   #echo "key=$key and value=$val"
-   params[$key]=$val
-   #echo "${params[$key]}"
+ key=${pair%%=*};
+  val=${pair#*=}
+  echo $key $val
+  params["${key}"]="${val}"
+    #echo "${params[$key]}"
 done
 unset IFS
 
 keys2check="sample_label mg_url customer sample_environment time_submitted
-make_public keep_data id"
+make_public keep_data"
 
 for i in ${keys2check}; do
   if [[ -n ${params["${i}"]} ]]; then
     VAR=$( echo "${i}" | tr '[:lower:]' '[:upper:]' )
     declare  "${VAR}"=${params["${i}"]};
+    echo "${VAR}" ${params["${i}"]};
   else
     mail -s "mg_traits:${JOB_ID} failed" "${mt_admin_mail}" << EOF
 "Mandatory ${i} not defined"
@@ -77,16 +74,61 @@ EOF
   fi
 done
 
+# From the input set variables:
+# SAMPLE_LABEL; MG_URL; CUSTOMER; SAMPLE_ENVIRONMENT;
+# TIME_SUBMITTED; MAKE_PUBLIC; KEEP_DATA
+
 ################################################################################
-# 1.2 - Set mg traits job specific variables
+# 1.2 - Initial insert
 ################################################################################
-THIS_JOB_TMP_DIR=$(readlink -m "${RUNNING_JOBS_DIR}/job-${JOB_ID}")
+
+if [[ -n "${target_db_name}" ]]; then
+
+  INSERT_DB=$( \
+  echo "INSERT INTO ${schema}.mg_traits_jobs VALUES ( \
+  'anonymous',\
+  '${MG_URL}',\
+  '${SAMPLE_LABEL}',\
+  'marine');" \
+  | psql \
+  -U "${target_db_user}" \
+  -h "${target_db_host}" \
+  -p "${target_db_port}" \
+  -d "${target_db_name}")
+
+  if [[ "$?" -ne "0" ]]; then
+     mail -s "Cannot insert into database. Output:${INSERT_DB}"; exit
+  fi
+
+  ID=$( echo "SELECT id FROM ${schema}.mg_traits_jobs WHERE \
+  sample_label = '${SAMPLE_LABEL}';" | psql \
+  -t \
+  -U "${target_db_user}" \
+  -h "${target_db_host}" \
+  -p "${target_db_port}" \
+  -d "${target_db_name}" )
+
+   if [[ "$?" -ne "0" ]]; then
+     mail -s "Cannot get id from database. Output:${INSERT_DB}"; exit
+   fi
+
+fi
+
+################################################################################
+# 1.3 - Set mg traits job specific variables
+################################################################################
+THIS_JOB_TMP_DIR=$(readlink -m "${RUNNING_JOBS_DIR}/${SAMPLE_LABEL}")
 THIS_JOB_TMP_DIR_DATA="${THIS_JOB_TMP_DIR}/data/"
 SINA_LOG_DIR="${THIS_JOB_TMP_DIR}/sina_log"
 FGS_JOBARRAYID="mt-${JOB_ID}-fgs"
 SMRNA_JOBARRAYID="mt-${JOB_ID}-smrna"
 SINA_JOBARRAYID="mt-${JOB_ID}-sina"
 FINISHJOBID="mt-${JOB_ID}-finish"
+PFAMUPROC_JOBARRAYID="mt-${JOB_ID}-pfam-uproc"
+BGCUPROC_JOBARRAYID="mt-${JOB_ID}-bgc-uproc"
+CHECK_JOBARRAYID="mt-${JOB_ID}-check"
+DEDUP_JOBARRAYID="mt-${JOB_ID}-dedup"
+
 TMP_VOL_FILE="/vol/tmp/megx/${JOB_NAME}.${JOB_ID}"
 
 # names
@@ -100,17 +142,29 @@ CLUST95_LOG="${THIS_JOB_TMP_DIR}/${CLUST95}.log"
 CLUST95_CLSTR="${THIS_JOB_TMP_DIR}/${CLUST95}.clstr"
 INFOSEQ_TMPFILE="${THIS_JOB_TMP_DIR}/04-stats-tempfile"
 INFOSEQ_MGSTATS="${THIS_JOB_TMP_DIR}/04-mg_stats"
-GENEAA="${THIS_JOB_TMP_DIR}/05-gene-aa-seqs"
-GENENT="${THIS_JOB_TMP_DIR}/05-gene-nt-seqs"
-GENERNA="${THIS_JOB_TMP_DIR}/06-gene-rna-seqs"
+GENEAA="${THIS_JOB_TMP_DIR}/05-gene.faa"
+GENENT="${THIS_JOB_TMP_DIR}/05-gene.ffn"
+GENERNA="${THIS_JOB_TMP_DIR}/06-gene-rna-seqs.fasta"
+
 PFAMDB="${THIS_JOB_TMP_DIR}/07-pfamdb"
+BGCDB="${THIS_JOB_TMP_DIR}/07-bgcdb"
+
 PFAMFILERAW="${THIS_JOB_TMP_DIR}/07-pfam-raw"
 PFAMFILERAW_LOG="${THIS_JOB_TMP_DIR}/07-pfam-raw.log"
 PFAMFILE="${THIS_JOB_TMP_DIR}/07-pfam"
-FUNCTIONALTABLE="${THIS_JOB_TMP_DIR}/07-pfam-functional-table"
+
+BGCFILERAW="${THIS_JOB_TMP_DIR}/07-bgc-raw"
+BGCFILERAW_LOG="${THIS_JOB_TMP_DIR}/07-bgc-raw.log"
+BGCFILE="${THIS_JOB_TMP_DIR}/07-bgc"
+
+PFAMFUNCTIONALTABLE="${THIS_JOB_TMP_DIR}/07-pfam-functional-table"
+BGCFUNCTIONALTABLE="${THIS_JOB_TMP_DIR}/07-bgc-functional-table"
+
 CODONCUSP="${THIS_JOB_TMP_DIR}/07-codon.cusp"
 TFPERC="${THIS_JOB_TMP_DIR}/07-tfperc"
-CLPERC="${THIS_JOB_TMP_DIR}/07-clperc"
+PFAMCLPERC="${THIS_JOB_TMP_DIR}/07-pfam-clperc"
+BGCCLPERC="${THIS_JOB_TMP_DIR}/07-bgc-clperc"
+
 AA_TABLE="${THIS_JOB_TMP_DIR}/08-aa-table"
 CODON_TABLE="${THIS_JOB_TMP_DIR}/08-codon-table"
 ABRATIO_FILE="${THIS_JOB_TMP_DIR}/08-ab-ratio"
@@ -130,9 +184,8 @@ PCA_DINUC_DB="${THIS_JOB_TMP_DIR}/10-pca-dinuc-db"
 PCA_FUNCTIONAL_DB="${THIS_JOB_TMP_DIR}/10-pca-functional-db"
 PCA_TAXONOMY_DB="${THIS_JOB_TMP_DIR}/10-pca-taxonomy-db"
 
-
 ################################################################################
-# 1.3 - Load functions: Only after all the variables have been defined
+# 1.4 - Load functions: Only after all the variables have been defined
 ################################################################################
 
 FUNCTIONS="${MG_TRAITS_DIR}/conf/mg-traits.functions.sh"
@@ -151,12 +204,17 @@ fi
 ################################################################################
 if [[ -n "${target_db_name}" ]]; then
   DB_RESULT=$( \
-    echo "UPDATE mg_traits.mg_traits_jobs SET time_started = now(), \
-          job_id = '${JOB_ID}', cluster_node = '${HOSTNAME}' \
+    echo "UPDATE ${schema}.mg_traits_jobs SET \
+          time_started = now(), \
+          job_id = '${JOB_ID}', \
+          cluster_node = '${HOSTNAME}' \
           WHERE sample_label = '${SAMPLE_LABEL}' \
-            AND id = ${ID};" \
-         | psql -U "${target_db_user}" -h "${target_db_host}" \
-                -p "${target_db_port}" -d "${target_db_name}" \
+          AND id = ${ID};" \
+         | psql \
+         -U "${target_db_user}" \
+         -h "${target_db_host}" \
+         -p "${target_db_port}" \
+         -d "${target_db_name}"
   )
   if [[ "$?" -ne "0" ]]; then
     error_exit "Cannot connect to database. Output:${DB_RESULT}" 1; exit
@@ -178,7 +236,7 @@ RETURN_CODE="$?"
 if [[ "${RETURN_CODE}" -ne "0" ]]; then
   db_error_comm "Could not access job temp dir ${THIS_JOB_TMP_DIR}. \
   RETURN_CODE = ${RETURN_CODE}"
-  error_exit  "Could not access job temp dir ${THIS_JOB_TMP_DIR}. \
+  error_exit "Could not access job temp dir ${THIS_JOB_TMP_DIR}. \
   RETURN_CODE = ${RETURN_CODE}" 1; exit
 fi
 
@@ -195,8 +253,7 @@ ERROR_MESSAGE=$(\
   check_required_writable_directories \
   "${temp_dir:?}" \
   "${RUNNING_JOBS_DIR:?}" \
-  "${FAILED_JOBS_DIR:?}" \
-  "${job_out_dir:?}";
+  "${FAILED_JOBS_DIR:?}" 
 
   check_required_programs \
   "${vsearch}" \
@@ -213,18 +270,23 @@ if [[ "${ERROR_MESSAGE}" ]]; then
 fi
 
 ################################################################################
-# 1.7 - check if it already exist on our DB
+# 1.7 - check if it already exists on our DB
 ################################################################################
 
 if [[ -n "${target_db_name}" ]]; then
 
-  if [[ "${SAMPLE_LABEL}" != "test_label" ]]; then
+  if [[ ! "${SAMPLE_LABEL}" =~ "test" ]]; then
     URLDB=$(
-           psql -t -U "${target_db_user}" -h "${target_db_host}" \
-                   -p "${target_db_port}" -d "${target_db_name}" -c \
-           "SELECT count(*) FROM mg_traits.mg_traits_jobs where \
-           mg_url = '${MG_URL}' AND sample_label NOT ILIKE 'test_label \
-           AND return_code = 0'"
+      echo "SELECT count(*) FROM ${schema}.mg_traits_jobs WHERE \
+            mg_url = '${MG_URL}' \
+            AND sample_label = '${SAMPLE_LABEL}' \
+            AND return_code = '0'"  | \
+            psql \
+            -t \
+            -U "${target_db_user}" \
+            -h "${target_db_host}" \
+            -p "${target_db_port}" \
+            -d "${target_db_name}"
           )
 
   if [[ "${URLDB}" -gt 1 ]]; then
@@ -274,6 +336,14 @@ fi
 # 1.10 - Check for duplicates
 ################################################################################
 
+
+qsub \
+-j y \
+-sync y \
+-l mf=60G \
+-o "${THIS_JOB_TMP_DIR}" \
+-N "${DEDUP_JOBARRAYID}" \
+-pe threaded "${NSLOTS}" \
 "${MODULES}"/deduplicator.sh \
 --config "${CONFIG}" \
 --input "${RAW_FASTA}" \
@@ -312,8 +382,10 @@ fi
 RETURN_CODE="$?"
 
 if [[ "${RETURN_CODE}" -ne "0" ]]; then
-  db_error_comm "Rscript ${seq_stats} cannot process sequence statistics"
-  error_exit "Rscript ${seq_stats} cannot process sequence statistics" 1; exit
+  db_error_comm "Rscript "${MODULES}"/seq_basic_stats.sh cannot process\
+ sequence  statistics"
+  error_exit "Rscript Rscript "${MODULES}"/seq_basic_stats.sh cannot process\
+ sequence statistics" 1; exit
 fi
 
 NUM_BASES=$(cut -f1 "${INFOSEQ_MGSTATS}" -d ' '); 
@@ -372,7 +444,6 @@ EVALUE=$( echo 1 / $(find "${THIS_JOB_TMP_DIR}" -name "05-part-[0-9]*.fasta" |\
 wc -l) | bc -l)
 
 qsub \
--sync y \
 -j y \
 -o "${THIS_JOB_TMP_DIR}" \
 -t 1-"${NFILES}" \
@@ -389,7 +460,7 @@ qsub \
 RETURN_CODE="$?"
 if [[ "${RETURN_CODE}" -ne "0" ]]; then
   db_error_comm "sortmerna failed. RETURN_CODE = ${RETURN_CODE}"
-  error_exit db_error_comm "sortmerna failed. RETURN_CODE = ${RETURN_CODE}" 1;
+  error_exit "sortmerna failed. RETURN_CODE = ${RETURN_CODE}" 1;
   exit
 fi
 
@@ -397,12 +468,12 @@ fi
 # 2.3 - run SINA
 ################################################################################
 
-NUM_RNA=$(egrep -c ">" <(cat "${THIS_JOB_TMP_DIR}"/06-part-*.fasta) )
-
-if [[ "${NUM_RNA}" -eq "0" ]]; then
-  db_error_comm "no RNA sequence found by sortmerna"
-  error_exit "no RNA sequence found by sortmerna" 1: exit
-fi
+# NUM_RNA=$(egrep -c ">" <(cat "${THIS_JOB_TMP_DIR}"/06-part-*.fasta) )
+# 
+# if [[ "${NUM_RNA}" -eq "0" ]]; then
+#   db_error_comm "no RNA sequence found by sortmerna"
+#   error_exit "no RNA sequence found by sortmerna" 1: exit
+# fi
 
 echo "${SINA_JOBARRAYID}"
 qsub \
@@ -425,7 +496,55 @@ if [[ "${RETURN_CODE}" -ne "0" ]]; then
 fi
 
 ################################################################################
-# 2.3 - Check results: fgs
+# 2.4 - PFAM Functional annotation
+################################################################################
+
+qsub \
+-j y \
+-t 1-"${NFILES}" \
+-o "${THIS_JOB_TMP_DIR}" \
+-pe threaded "${NSLOTS}" \
+-N "${PFAMUPROC_JOBARRAYID}" \
+-hold_jid "${FGS_JOBARRAYID}" \
+"${MODULES}"/uproc_pfam_runner.sh \
+--config "${CONFIG}" \
+--prefix 05-part \
+--inputdir "${THIS_JOB_TMP_DIR}" \
+--outdir "${THIS_JOB_TMP_DIR}" \
+--log "${PFAMFILERAW_LOG}"
+
+RETURN_CODE="$?"
+if [[ "${RETURN_CODE}" != "0" ]]; then
+  db_error_comm "uproc_pfam_runner.sh failed. RETURN_CODE = ${RETURN_CODE}"
+  error_exit "uproc_pfam_runner.sh failed. RETURN_CODE = ${RETURN_CODE}" 1; exit
+fi
+
+################################################################################
+# 2.5 - ufBGC-recruiter annotation
+################################################################################
+
+qsub \
+-j y \
+-t 1-"${NFILES}" \
+-o "${THIS_JOB_TMP_DIR}" \
+-pe threaded "${NSLOTS}" \
+-N "${BGCUPROC_JOBARRAYID}" \
+-hold_jid "${FGS_JOBARRAYID}" \
+"${MODULES}"/uproc_bgc_runner.sh \
+--config "${CONFIG}" \
+--prefix 05-part \
+--inputdir "${THIS_JOB_TMP_DIR}" \
+--outdir "${THIS_JOB_TMP_DIR}" \
+--log "${BGCFILERAW_LOG}"
+
+RETURN_CODE="$?"
+if [[ "${RETURN_CODE}" != "0" ]]; then
+  db_error_comm "uproc_bgc_runner.sh failed. RETURN_CODE = ${RETURN_CODE}"
+  error_exit "uproc_bgc_runner.sh failed. RETURN_CODE = ${RETURN_CODE}" 1; exit
+fi
+
+################################################################################
+# 2.3 - Check results: fgs, sormerna, sina
 ################################################################################
 
 qsub \
@@ -433,7 +552,12 @@ qsub \
 -j y \
 -o "${THIS_JOB_TMP_DIR}" \
 -pe threaded "${NSLOTS}" \
--hold_jid "${FGS_JOBARRAYID}","${SINA_JOBARRAYID}" \
+-N "${CHECK_JOBARRAYID}" \
+-hold_jid \
+"${FGS_JOBARRAYID}",\
+"${SINA_JOBARRAYID}",\
+"${PFAMUPROC_JOBARRAYID}",\
+"${BGCUPROC_JOBARRAYID}" \
 "${MODULES}"/check_point.sh \
   --config "${CONFIG}" \
   --inputdir "${THIS_JOB_TMP_DIR}" \
@@ -447,48 +571,38 @@ if [[ "${RETURN_CODE}" -ne "0" ]]; then
 fi
 
 ################################################################################
-# 2.4 - Concatenate CDS
+# 2.6 - Concatenate CDS and PFAM and BGC annotations
 ################################################################################
 
 cat "${THIS_JOB_TMP_DIR}"/05-part*.genes.faa > "${GENEAA}"
 cat "${THIS_JOB_TMP_DIR}"/05-part*.genes.ffn > "${GENENT}"
 
-################################################################################
-# 2.5 - Functional annotation
-################################################################################
+cat "${THIS_JOB_TMP_DIR}"/05-part*-pfam-raw  > "${PFAMFILERAW}"
+cat "${THIS_JOB_TMP_DIR}"/05-part*-bgc-raw > "${BGCFILERAW}"
+
+cut -f2,7 -d ',' "${BGCFILERAW}" > "${BGCFILE}"
+cut -f2,7 -d ',' "${PFAMFILERAW}" > "${PFAMFILE}"
+
 
 NUM_GENES=$( grep -c '>' "${GENENT}" )
 
 if [[ "${NUM_GENES}" -eq "0" ]]; then
   db_error_comm "No genes found by fgs. NUM_GENES = ${NUM_GENES}"
-  error_exit  "No genes found by fgs. NUM_GENES = ${NUM_GENES}" 1; exit
+  error_exit "No genes found by fgs. NUM_GENES = ${NUM_GENES}" 1; exit
 fi
 
-"${MODULES}"/uproc_runner.sh \
---config "${CONFIG}" \
---input "${GENENT}" \
---output "${PFAMFILERAW}" \
---log "${PFAMFILERAW_LOG}"
-
-RETURN_CODE="$?"
-if [[ "${RETURN_CODE}" != "0" ]]; then
-  db_error_comm "uproc_runner.sh failed. RETURN_CODE = ${RETURN_CODE}"
-  error_exit "uproc_runner.sh failed. RETURN_CODE = ${RETURN_CODE}" 1; exit
-fi
-
-cut -f2,7 -d ',' "${PFAMFILERAW}" > "${PFAMFILE}"
 
 ################################################################################
-# 2.6 - Create functional table
+# 2.7 - Create pfam functional table
 ################################################################################
 
-"${MODULES}"/create_fun_table.sh \
+"${MODULES}"/create_pfam_table.sh \
 --config "${CONFIG}" \
 --num_genes "${NUM_GENES}" \
 --input "${PFAMFILE}" \
---fun_table "${FUNCTIONALTABLE}" \
+--fun_table "${PFAMFUNCTIONALTABLE}" \
 --tfperc "${TFPERC}" \
---clperc "${CLPERC}"
+--clperc "${PFAMCLPERC}"
 
 RETURN_CODE="$?"
 if [[ "${RETURN_CODE}" != "0" ]]; then
@@ -496,11 +610,32 @@ if [[ "${RETURN_CODE}" != "0" ]]; then
   error_exit "create_fun_table failed. RETURN_CODE = ${RETURN_CODE}" 1; exit
 fi
 
-sort -k1 "${FUNCTIONALTABLE}" | sed -e 's/\t/=>/g' | tr '\n' ',' | \
+sort -k1 "${PFAMFUNCTIONALTABLE}" | sed -e 's/\t/=>/g' | tr '\n' ',' | \
 sed -e 's/^/\"/' -e 's/,$/\"/' > "${PFAMDB}"
 
+
 ################################################################################
-# 2.7 - Compute codon usage
+# 2.8 - Create bgc functional table
+################################################################################
+
+"${MODULES}"/create_bgc_table.sh \
+--config "${CONFIG}" \
+--num_genes "${NUM_GENES}" \
+--input "${BGCFILE}" \
+--fun_table "${BGCFUNCTIONALTABLE}" \
+--clperc "${BGCCLPERC}"
+
+RETURN_CODE="$?"
+if [[ "${RETURN_CODE}" != "0" ]]; then
+  db_error_comm "create_fun_table.sh failed. RETURN_CODE = ${RETURN_CODE}"
+  error_exit "create_fun_table failed. RETURN_CODE = ${RETURN_CODE}" 1; exit
+fi
+
+sort -k1 "${BGCFUNCTIONALTABLE}" | sed -e 's/\t/=>/g' | tr '\n' ',' | \
+sed -e 's/^/\"/' -e 's/,$/\"/' > "${BGCDB}"
+
+################################################################################
+# 2.9 - Compute codon usage
 ################################################################################
 
 cusp --auto -stdout "${GENENT}" |awk '{if ($0 !~ "*" && $0 !~ /[:alphanum:]/ \
@@ -513,7 +648,7 @@ if [[ "${RETURN_CODE}" -ne "0" ]]; then
 fi
 
 ################################################################################
-# 2.8 - Create codon and aa usage table
+# 3.1 - Create codon and aa usage tables
 ################################################################################
 
 "${MODULES}"/create_codon_aa_table.sh \
@@ -532,10 +667,11 @@ fi
 
 ABRATIO=$(cat "${ABRATIO_FILE}" )
 PERCTF=$(cat "${TFPERC}" )
-PERCCL=$(cat "${CLPERC}" )
+PFAMPERCCL=$(cat "${PFAMCLPERC}" )
+BGCPERCCL=$(cat "${BGCCLPERC}" )
 
 ################################################################################
-# 2.9 - Words composition: nuc frec
+# 3.2 - Words composition: nuc frec
 ################################################################################
 
 compseq --auto -stdout -word 1 "${RAW_FASTA}" | awk '{if (NF == 5 && \
@@ -587,10 +723,10 @@ fi
 cat "${THIS_JOB_TMP_DIR}"/06-part-*.classify.fasta > "${GENERNA}"
 
 "${MODULES}"/taxa_parser.sh \
---config "${CONFIG}" \
---input "${GENERNA}" \
---slv_raw "${SLV_TAX_RAW}" \
---slv_order "${SLV_TAX_ORDER}"
+  --config "${CONFIG}" \
+  --input "${GENERNA}" \
+  --slv_raw "${SLV_TAX_RAW}" \
+  --slv_order "${SLV_TAX_ORDER}"
 
 RETURN_CODE="$?"
 if [[ "${RETURN_CODE}" -ne "0" ]]; then
@@ -637,6 +773,22 @@ if [[ "$?" -ne "0" ]]; then
   exit
 fi
 
+
+################################################################################
+# 2.15 - load mg_traits_bgc
+################################################################################
+
+db_table_load1 "${BGCDB}" mg_traits_bgc_functional
+
+RETURN_CODE="$?"
+if [[ "$?" -ne "0" ]]; then
+  db_error_comm "Error inserting BGCDB results. RETURN_CODE = ${RETURN_CODE}"
+  error_exit "Error inserting BGCDB results. RETURN_CODE = ${RETURN_CODE}" 1;
+  exit
+fi
+
+
+
 ################################################################################
 # 2.16 - load mg_traits_taxonomy
 ################################################################################
@@ -667,13 +819,34 @@ fi
 # 2.18 - insert simple traits into mg_traits_results
 ################################################################################
 
-echo "INSERT INTO epereira.mg_traits_results \
-(sample_label, gc_content, gc_variance, num_genes, total_mb, \
-num_reads, ab_ratio, perc_tf, perc_classified, id) VALUES \
-('${SAMPLE_LABEL}',${GC},${VARGC}, ${NUM_GENES}, ${NUM_BASES},${NUM_READS},\
-${ABRATIO}, ${PERCTF}, ${PERCCL}, ${ID});" | psql \
--U "${target_db_user}" -h "${target_db_host}" \
--p "${target_db_port}" -d "${target_db_name}"
+echo "INSERT INTO ${schema}.mg_traits_results ( \
+      sample_label,\
+      gc_content,\
+      gc_variance,\
+      num_genes,\
+      total_mb,\
+      num_reads,\
+      ab_ratio,\
+      perc_tf,\
+      perc_pfam_classified,\
+      perc_bgc_classified,\
+      id) VALUES (\
+      '${SAMPLE_LABEL}',\
+      ${GC},\
+      ${VARGC},\
+      ${NUM_GENES},\
+      ${NUM_BASES},\
+      ${NUM_READS},\
+      ${ABRATIO},\
+      ${PERCTF},\
+      ${PFAMPERCCL},\
+      ${BGCPERCCL},\
+      ${ID});" | \
+      psql \
+      -U "${target_db_user}" \
+      -h "${target_db_host}" \
+      -p "${target_db_port}" \
+      -d "${target_db_name}"
 
 RETURN_CODE="$?"
 if [[ "${RETURN_CODE}" -ne "0" ]]; then
@@ -691,10 +864,14 @@ fi
 
 # Get existing data for CODON
 
-NUMROWS=$( echo "SELECT COUNT(C.*) FROM mg_traits.mg_traits_codon C INNER JOIN \
-mg_traits.mg_traits_jobs_public P ON C.id = P.id" | psql -t \
--U "${target_db_user}" -h "${target_db_host}" \
--p "${target_db_port}" -d "${target_db_name}" )
+NUMROWS=$( \
+  echo "SELECT COUNT(C.*) FROM mg_traits.mg_traits_codon C \
+        INNER JOIN mg_traits.mg_traits_jobs_public P ON C.id = P.id" | \
+        psql -t \
+        -U "${target_db_user}" \
+        -h "${target_db_host}" \
+        -p "${target_db_port}" \
+        -d "${target_db_name}" )
 
 RETURN_CODE="$?"
 if [[ "${RETURN_CODE}" -ne "0" ]]; then
@@ -848,6 +1025,26 @@ if [[ "${NUMROWS}" -ge "30" ]]; then
 
 fi
 
+
+################################################################################
+# remove data
+################################################################################
+
+rm -r \
+"${RAW_FASTA}" \
+"${UNIQUE}" \
+"${INFOSEQ_TMPFILE}" \
+"${GENEAA}" \
+"${PFAMFILERAW}" \
+"${PFAMFILE}" \
+"${BGCFILERAW}" \
+"${BGCFILE}" \
+"${THIS_JOB_TMP_DIR}"/05-part-* \
+"${THIS_JOB_TMP_DIR}"/06-part-*
+
+mkdir "${THIS_JOB_TMP_DIR}"/sge_logs
+mv "${THIS_JOB_TMP_DIR}"/mt-"${JOB_ID}"* "${THIS_JOB_TMP_DIR}"/sge_logs
+
 ################################################################################
 # update mg_traits_jobs
 ################################################################################
@@ -856,19 +1053,29 @@ END_TIME=$( date +%s.%N )
 RUN_TIME=$( echo "${END_TIME}"-"${START_TIME}" | bc -l )
 
 
-RETURN=$( echo "UPDATE mg_traits.mg_traits_jobs SET time_finished = now(), \
-return_code = 0, total_run_time = ${RUN_TIME}, \
-time_protocol = time_protocol || ('${JOB_ID}', 'mg_traits_finish', \
-${RUN_TIME})::mg_traits.time_log_entry \
- WHERE sample_label = '${SAMPLE_LABEL}' AND id = '${ID}';" | psql \
--U "${target_db_user}" -h "${target_db_host}" \
--p "${target_db_port}" -d "${target_db_name}" )
+RETURN=$( echo \
+        "UPDATE ${schema}.mg_traits_jobs SET \
+        time_finished = now(), \
+        return_code = 0, \
+        total_run_time = ${RUN_TIME}, \
+        time_protocol = time_protocol || \
+        ('${JOB_ID}', \
+        'mg_traits_finish',\
+        ${RUN_TIME})::mg_traits.time_log_entry \
+        WHERE \
+        sample_label = '${SAMPLE_LABEL}' AND id = '${ID}';" | \
+        psql \
+        -U "${target_db_user}" \
+        -h "${target_db_host}" \
+        -p "${target_db_port}" \
+        -d "${target_db_name}" )
 
 
 if [[ "${RETURN}" != "UPDATE 1" ]]; then
   db_error_comm "Error updating job table. RETURN_CODE = ${RETURN_CODE}"
   error_exit "Error updating jobs table. RETURN_CODE = ${RETURN_CODE}" 1; exit
 fi
+
 
 
 mv "${THIS_JOB_TMP_DIR}" "${FINISHED_JOBS_DIR}"
@@ -880,11 +1087,16 @@ if [[ "${RETURN_CODE}" -ne "0" ]]; then
   exit
 fi
 
-TOTAL_TIME=$( echo "SELECT (time_finished - time_started) FROM \
-mg_traits.mg_traits_jobs WHERE sample_label = '${SAMPLE_LABEL}' \
-AND id = '${ID}';" | psql -t \
--U "${target_db_user}" -h "${target_db_host}" \
--p "${target_db_port}" -d "${target_db_name}" | tr -d ' ')
+TOTAL_TIME=$( echo \
+            "SELECT (time_finished - time_started) FROM \
+             ${schema}.mg_traits_jobs WHERE \
+             sample_label = '${SAMPLE_LABEL}' \
+             AND id = '${ID}';" | \
+             psql -t \
+             -U "${target_db_user}" \
+             -h "${target_db_host}" \
+             -p "${target_db_port}" \
+             -d "${target_db_name}" | tr -d ' ')
 
 
 RETURN_CODE="$?"
@@ -895,14 +1107,5 @@ Analysis of ${SAMPLE_LABEL} done in ${TOTAL_TIME}.
 EOF
   exit 0
 fi
-
-# echo "UPDATE mg_traits.mg_traits_jobs SET total_run_time = total_run_time + \
-# ${RUN_TIME}, time_protocol = time_protocol || ('${JOB_ID}', 'mg_traits', \
-# ${RUN_TIME})::mg_traits.time_log_entry WHERE \
-# sample_label = '${SAMPLE_LABEL}' AND id = '${MG_ID}';" \
-# | psql -U "${target_db_user}" -h "${target_db_host}" -p "${target_db_port}" \
-# -d "${target_db_name}"
-
-
 
 
