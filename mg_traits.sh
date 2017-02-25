@@ -772,14 +772,14 @@ fi
 # 2.15 - load mg_traits_bgc
 ################################################################################
 
-db_table_load1 "${BGCDB}" mg_traits_bgc_functional
-
-RETURN_CODE="$?"
-if [[ "$?" -ne "0" ]]; then
-  db_error_comm "Error inserting BGCDB results. RETURN_CODE = ${RETURN_CODE}"
-  error_exit "Error inserting BGCDB results. RETURN_CODE = ${RETURN_CODE}" 1;
-  exit
-fi
+# db_table_load1 "${BGCDB}" mg_traits_bgc_functional
+# 
+# RETURN_CODE="$?"
+# if [[ "$?" -ne "0" ]]; then
+#   db_error_comm "Error inserting BGCDB results. RETURN_CODE = ${RETURN_CODE}"
+#   error_exit "Error inserting BGCDB results. RETURN_CODE = ${RETURN_CODE}" 1;
+#   exit
+# fi
 
 
 
