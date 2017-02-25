@@ -468,12 +468,6 @@ fi
 # 2.3 - run SINA
 ################################################################################
 
-# NUM_RNA=$(egrep -c ">" <(cat "${THIS_JOB_TMP_DIR}"/06-part-*.fasta) )
-# 
-# if [[ "${NUM_RNA}" -eq "0" ]]; then
-#   db_error_comm "no RNA sequence found by sortmerna"
-#   error_exit "no RNA sequence found by sortmerna" 1: exit
-# fi
 
 echo "${SINA_JOBARRAYID}"
 qsub \
