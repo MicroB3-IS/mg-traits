@@ -1,7 +1,7 @@
 #!/bin/bash
 
- set -x
-# set -o pipefail
+set -x
+set -o pipefail
 
 START_TIME=$(date +%s.%N)
 MG_TRAITS_DIR="$(dirname "$(readlink -f "$0")")"
@@ -74,45 +74,6 @@ EOF
   fi
 done
 
-# From the input set variables:
-# SAMPLE_LABEL; MG_URL; CUSTOMER; SAMPLE_ENVIRONMENT;
-# TIME_SUBMITTED; MAKE_PUBLIC; KEEP_DATA
-
-################################################################################
-# 1.2 - Initial insert
-################################################################################
-
-# if [[ -n "${target_db_name}" ]]; then
-# 
-#   INSERT_DB=$( \
-#   echo "INSERT INTO ${schema}.mg_traits_jobs VALUES ( \
-#   'anonymous',\
-#   '${MG_URL}',\
-#   '${SAMPLE_LABEL}',\
-#   'marine');" \
-#   | psql \
-#   -U "${target_db_user}" \
-#   -h "${target_db_host}" \
-#   -p "${target_db_port}" \
-#   -d "${target_db_name}")
-# 
-#   if [[ "$?" -ne "0" ]]; then
-#      mail -s "Cannot insert into database. Output:${INSERT_DB}"; exit
-#   fi
-# 
-#   ID=$( echo "SELECT id FROM ${schema}.mg_traits_jobs WHERE \
-#   sample_label = '${SAMPLE_LABEL}';" | psql \
-#   -t \
-#   -U "${target_db_user}" \
-#   -h "${target_db_host}" \
-#   -p "${target_db_port}" \
-#   -d "${target_db_name}" )
-# 
-#    if [[ "$?" -ne "0" ]]; then
-#      mail -s "Cannot get id from database. Output:${INSERT_DB}"; exit
-#    fi
-# 
-# fi
 
 ################################################################################
 # 1.3 - Set mg traits job specific variables
@@ -242,7 +203,6 @@ if [[ "${RETURN_CODE}" -ne "0" ]]; then
   RETURN_CODE = ${RETURN_CODE}" 1; exit
 fi
 
-
 ################################################################################
 # 1.6 - Check for utilities, files and directories
 ################################################################################
@@ -338,7 +298,6 @@ fi
 # 1.10 - Check for duplicates
 ################################################################################
 
-
 qsub \
 -j y \
 -sync y \
@@ -361,7 +320,6 @@ fi
 
 NUM_READS=$( egrep -o  "in\ [0-9]+\ seqs"  "${UNIQUE_LOG}" | \
 awk '{ print $2}'\ )
-
 
 ################################################################################
 # 1.11 - Calculate sequence statistics
@@ -774,14 +732,14 @@ fi
 # 2.15 - load mg_traits_bgc
 ################################################################################
 
-# db_table_load1 "${BGCDB}" mg_traits_bgc_functional
-# 
-# RETURN_CODE="$?"
-# if [[ "$?" -ne "0" ]]; then
-#   db_error_comm "Error inserting BGCDB results. RETURN_CODE = ${RETURN_CODE}"
-#   error_exit "Error inserting BGCDB results. RETURN_CODE = ${RETURN_CODE}" 1;
-#   exit
-# fi
+db_table_load1 "${BGCDB}" mg_traits_bgc_functional
+
+RETURN_CODE="$?"
+if [[ "$?" -ne "0" ]]; then
+  db_error_comm "Error inserting BGCDB results. RETURN_CODE = ${RETURN_CODE}"
+  error_exit "Error inserting BGCDB results. RETURN_CODE = ${RETURN_CODE}" 1;
+  exit
+fi
 
 ################################################################################
 # 2.16 - load mg_traits_taxonomy
